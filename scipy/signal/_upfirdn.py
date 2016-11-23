@@ -33,7 +33,7 @@
 
 import numpy as np
 
-from ._upfirdn_apply import _output_len, _apply
+from ._upfirdn_apply import _output_len, _apply, _apply_axis
 
 __all__ = ['upfirdn', '_output_len']
 
@@ -81,6 +81,23 @@ class _UpFIRDn(object):
         _apply(np.asarray(x, self._output_type), self._h_trans_flip, out,
                self._up, self._down)
         return out
+
+    def apply_filter_along_axis(self, x, axis):
+        """Apply the prepared filter the specified axis of a nD signal x"""
+        output_len = _output_len(len(self._h_trans_flip), len(x),
+                                 self._up, self._down)
+        out = np.zeros(output_len, dtype=self._output_type)
+        # TODO: ensure contiguity of h_trans_flip
+        _apply_axis(np.asarray(x, self._output_type), self._h_trans_flip, out,
+                    self._up, self._down, axis)
+        return out
+
+
+def _upfirdn_slow(h, x, up=1, down=1, axis=-1):
+    """legacy version using np.apply_along_axis.  Used for testing."""
+    x = np.asarray(x)
+    ufd = _UpFIRDn(h, x.dtype, up, down)
+    return np.apply_along_axis(ufd.apply_filter, axis, x)
 
 
 def upfirdn(h, x, up=1, down=1, axis=-1):
@@ -174,4 +191,5 @@ def upfirdn(h, x, up=1, down=1, axis=-1):
     """
     x = np.asarray(x)
     ufd = _UpFIRDn(h, x.dtype, up, down)
-    return np.apply_along_axis(ufd.apply_filter, axis, x)
+    # return np.apply_along_axis(ufd.apply_filter, axis, x)
+    return ufd.apply_filter_along_axis(x, axis)
