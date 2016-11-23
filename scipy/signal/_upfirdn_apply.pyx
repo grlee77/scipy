@@ -36,7 +36,6 @@
 cimport cython
 cimport numpy as np
 import numpy as np
-cimport numpy as cnp
 from cython import bint  # boolean integer type
 from libc.stdlib cimport malloc, free
 
@@ -73,25 +72,13 @@ def _output_len(Py_ssize_t len_h,
     return need
 
 
-cpdef _apply_axis(np.ndarray data, np.ndarray h_trans_flip, np.ndarray out,
+cpdef _apply_axis(np.ndarray data, DTYPE_t [:] h_trans_flip, np.ndarray out,
                   Py_ssize_t up, Py_ssize_t down, Py_ssize_t axis):
     cdef ArrayInfo data_info, output_info
     cdef Py_ssize_t len_h = h_trans_flip.size
-    # TODO: is their a way to keep nogil below and not have to declare all
-    #       possible pointer types up here?
-    # (cannot use cnp.PyArray_DATA within nogil block)
-    cdef double *d_dptr
-    cdef double *d_hptr
-    cdef double *d_optr
-    cdef float *s_dptr
-    cdef float *s_hptr
-    cdef float *s_optr
-    cdef float_complex *c_dptr
-    cdef float_complex *c_hptr
-    cdef float_complex *c_optr
-    cdef double_complex *z_dptr
-    cdef double_complex *z_hptr
-    cdef double_complex *z_optr
+    cdef DTYPE_t *data_ptr
+    cdef DTYPE_t *filter_ptr
+    cdef DTYPE_t *out_ptr
 
     data_info.ndim = data.ndim
     data_info.strides = <Py_ssize_t *> data.strides
@@ -101,48 +88,16 @@ cpdef _apply_axis(np.ndarray data, np.ndarray h_trans_flip, np.ndarray out,
     output_info.strides = <Py_ssize_t *> out.strides
     output_info.shape = <Py_ssize_t *> out.shape
 
-    if data.dtype == np.float64:
-        d_dptr = <double*> cnp.PyArray_DATA(data)
-        d_hptr = <double*> cnp.PyArray_DATA(h_trans_flip)
-        d_optr = <double*> cnp.PyArray_DATA(out)
-        with nogil:
-            retval = _apply_axis_inner(d_dptr, data_info,
-                                       d_hptr, len_h,
-                                       d_optr, output_info,
-                                       up, down, axis)
-        if retval:
-            raise RuntimeError("_apply_axis_inner failed")
-    elif data.dtype == np.float32:
-        s_dptr = <float*> cnp.PyArray_DATA(data)
-        s_hptr = <float*> cnp.PyArray_DATA(h_trans_flip)
-        s_optr = <float*> cnp.PyArray_DATA(out)
-        with nogil:
-            retval = _apply_axis_inner(s_dptr, data_info,
-                                       s_hptr, len_h,
-                                       s_optr, output_info,
-                                       up, down, axis)
-    elif data.dtype == np.complex128:
-        z_dptr = <double_complex*> cnp.PyArray_DATA(data)
-        z_hptr = <double_complex*> cnp.PyArray_DATA(h_trans_flip)
-        z_optr = <double_complex*> cnp.PyArray_DATA(out)
-        with nogil:
-            retval = _apply_axis_inner(z_dptr, data_info,
-                                       z_hptr, len_h,
-                                       z_optr, output_info,
-                                       up, down, axis)
-        if retval:
-            raise RuntimeError("_apply_axis_inner failed")
-    elif data.dtype == np.complex64:
-        c_dptr = <float_complex*> cnp.PyArray_DATA(data)
-        c_hptr = <float_complex*> cnp.PyArray_DATA(h_trans_flip)
-        c_optr = <float_complex*> cnp.PyArray_DATA(out)
-        with nogil:
-            retval = _apply_axis_inner(c_dptr, data_info,
-                                       c_hptr, len_h,
-                                       c_optr, output_info,
-                                       up, down, axis)
-        if retval:
-            raise RuntimeError("_apply_axis_inner failed")
+    data_ptr = <DTYPE_t*> data.data
+    filter_ptr = <DTYPE_t*> &h_trans_flip[0]
+    out_ptr = <DTYPE_t*> out.data
+    with nogil:
+        retval = _apply_axis_inner(data_ptr, data_info,
+                                   filter_ptr, len_h,
+                                   out_ptr, output_info,
+                                   up, down, axis)
+    if retval:
+        raise RuntimeError("_apply_axis_inner failed")
     return out
 
 
