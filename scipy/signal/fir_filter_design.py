@@ -6,7 +6,7 @@ from math import ceil, log
 import warnings
 
 import numpy as np
-from numpy.fft import irfft, fft, ifft
+from scipy.fftpack import irfft, fft, ifft
 from scipy.special import sinc
 from scipy.linalg import toeplitz, hankel, pinv
 from scipy._lib.six import string_types
