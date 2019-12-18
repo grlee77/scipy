@@ -305,29 +305,38 @@ class _TestConvolve2d(object):
         assert_array_equal(c, d)
 
     def test_fillvalue_deprecations(self):
-        # Deprecated 2017-07, scipy version 1.0.0
-        with suppress_warnings() as sup:
-            sup.filter(np.ComplexWarning, "Casting complex values to real")
-            r = sup.record(DeprecationWarning, "could not cast `fillvalue`")
-            convolve2d([[1]], [[1, 2]], fillvalue=1j)
-            assert_(len(r) == 1)
-            warnings.filterwarnings(
-                "error", message="could not cast `fillvalue`",
-                category=DeprecationWarning)
-            assert_raises(DeprecationWarning, convolve2d, [[1]], [[1, 2]],
-                          fillvalue=1j)
 
-        with suppress_warnings():
-            warnings.filterwarnings(
-                "always", message="`fillvalue` must be scalar or an array ",
-                category=DeprecationWarning)
-            assert_warns(DeprecationWarning, convolve2d, [[1]], [[1, 2]],
-                         fillvalue=[1, 2])
-            warnings.filterwarnings(
-                "error", message="`fillvalue` must be scalar or an array ",
-                category=DeprecationWarning)
-            assert_raises(DeprecationWarning, convolve2d, [[1]], [[1, 2]],
-                          fillvalue=[1, 2])
+        # grlee77: changed to ValueError
+        with pytest.raises(ValueError):
+            convolve2d([[1]], [[1, 2]], fillvalue=1j)
+
+        # # Deprecated 2017-07, scipy version 1.0.0
+        # with suppress_warnings() as sup:
+        #     sup.filter(np.ComplexWarning, "Casting complex values to real")
+        #     r = sup.record(DeprecationWarning, "could not cast `fillvalue`")
+        #     convolve2d([[1]], [[1, 2]], fillvalue=1j)
+        #     assert_(len(r) == 1)
+        #     warnings.filterwarnings(
+        #         "error", message="could not cast `fillvalue`",
+        #         category=DeprecationWarning)
+        #     assert_raises(DeprecationWarning, convolve2d, [[1]], [[1, 2]],
+        #                   fillvalue=1j)
+
+        # with suppress_warnings():
+        #     warnings.filterwarnings(
+        #         "always", message="`fillvalue` must be scalar or an array ",
+        #         category=DeprecationWarning)
+        #     assert_warns(DeprecationWarning, convolve2d, [[1]], [[1, 2]],
+        #                  fillvalue=[1, 2])
+        #     warnings.filterwarnings(
+        #         "error", message="`fillvalue` must be scalar or an array ",
+        #         category=DeprecationWarning)
+        #     assert_raises(DeprecationWarning, convolve2d, [[1]], [[1, 2]],
+        #                   fillvalue=[1, 2])
+
+        # grlee77: changed to ValueError
+        with pytest.raises(ValueError):
+            convolve2d([[1]], [[1, 2]], fillvalue=[1, 2])
 
     def test_fillvalue_empty(self):
         # Check that fillvalue being empty raises an error:

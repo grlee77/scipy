@@ -70,15 +70,17 @@ def _convolveND(in1, in2, mode='same', boundary='fill', fillvalue=0):
             origin.append(-1)
     origin = tuple(origin)
 
-    if mode == 'valid':
-        size_comp = [s2 > s1 for s1, s2 in zip(in1.shape, in2.shape)]
-        if any(size_comp):
-            if not all(size_comp):
-                raise ValueError("in2 cannot be larger than in1 on some axes, but smaller on others")
-            in1, in2 = in2, in1
-            swapped = True
-        else:
-            swapped = False
+    if not np.isscalar(fillvalue):
+        raise ValueError("non-scalar fillvalue not supported")
+    if fillvalue and np.iscomplexobj(fillvalue):
+        raise ValueError("complex fillvalue not supported")
+
+    # if mode == 'valid':
+    #     size_comp = [s2 > s1 for s1, s2 in zip(in1.shape, in2.shape)]
+    #     if any(size_comp):
+    #         if not all(size_comp):
+    #             raise ValueError("in2 cannot be larger than in1 on some axes, but smaller on others")
+    #         in1, in2 = in2, in1
 
     ndi_mode = _ndi_boundarydict[boundary]
     if mode == 'full':
@@ -89,7 +91,15 @@ def _convolveND(in1, in2, mode='same', boundary='fill', fillvalue=0):
             in1 = np.pad(in1, pad_width=pad_width, mode=pad_mode, constant_values=fillvalue)
         else:
             pad_width = [((s - 1), (s - 1)) for s in in2.shape]
-            sl_out = tuple([slice((s - 1) - (s - 1) // 2, -(s - 1) + math.ceil((s - 1) / 2)) for s in in2.shape])
+            def _get_sl(s):
+                if s == 1:
+                    return slice(None)
+                elif s == 2:
+                    return slice(1, None)
+                else:
+                    return slice((s - 1) - (s - 1) // 2, -(s - 1) + math.ceil((s - 1) / 2))
+
+            sl_out = tuple([_get_sl(s) for s in in2.shape])
             in1 = np.pad(in1, pad_width=pad_width, mode=pad_mode)
     in1_cplx = in1.dtype.kind == 'c'
     in2_cplx = in2.dtype.kind == 'c'
@@ -113,6 +123,8 @@ def _convolveND(in1, in2, mode='same', boundary='fill', fillvalue=0):
         for s in in2.shape:
             if s == 1:
                 sl = slice(None)
+            elif s == 2:
+                sl = slice(1, None)
             else:
                 sl = slice(math.ceil((s - 1) / 2), -math.floor((s - 1) / 2))
             sl_out.append(sl)
@@ -126,15 +138,12 @@ def _convolveND(in1, in2, mode='same', boundary='fill', fillvalue=0):
 def _correlateND(in1, in2, mode='same'):
     from scipy import ndimage as ndi
 
-    if mode == 'valid':
-        size_comp = [s2 > s1 for s1, s2 in zip(in1.shape, in2.shape)]
-        if any(size_comp):
-            if not all(size_comp):
-                raise ValueError("in2 cannot be larger than in1 on some axes, but smaller on others")
-            in1, in2 = in2, in1
-            swapped = True
-        else:
-            swapped = False
+    # if mode == 'valid':
+    #     size_comp = [s2 > s1 for s1, s2 in zip(in1.shape, in2.shape)]
+    #     if any(size_comp):
+    #         if not all(size_comp):
+    #             raise ValueError("in2 cannot be larger than in1 on some axes, but smaller on others")
+    #         in1, in2 = in2, in1
 
     if mode == 'full':
         in1 = np.pad(in1, pad_width=[((s - 1) // 2, math.ceil((s - 1) / 2))
@@ -144,15 +153,15 @@ def _correlateND(in1, in2, mode='same'):
     if in1_cplx:
         if in2_cplx:
             out = ndi.correlate(in1.real, in2.real, mode='constant')
-            out -= ndi.correlate(in1.imag, -in2.imag, mode='constant')
-            out = out - 1j * ndi.correlate(in1.real, -in2.imag, mode='constant')
-            out = out - 1j * ndi.correlate(in1.imag, in2.real, mode='constant')
+            out += ndi.correlate(in1.imag, in2.imag, mode='constant')
+            out = out + 1j * ndi.correlate(in1.real, -in2.imag, mode='constant')
+            out = out + 1j * ndi.correlate(in1.imag, in2.real, mode='constant')
         else:
             out = ndi.correlate(in1.real, in2, mode='constant')
             out = out + 1j * ndi.correlate(in1.imag, in2, mode='constant')
     elif in2_cplx:
         out = ndi.correlate(in1, in2.real, mode='constant')
-        out = out - 1j * ndi.correlate(in1, -in2.imag, mode='constant')
+        out = out + 1j * ndi.correlate(in1, -in2.imag, mode='constant')
     else:
         out = ndi.correlate(in1, in2, mode='constant')
     if mode == 'valid':
@@ -161,6 +170,8 @@ def _correlateND(in1, in2, mode='same'):
         for s in in2.shape:
             if s == 1:
                 sl = slice(None)
+            elif s == 2:
+                sl = slice(1, None)
             else:
                 sl = slice(math.ceil((s - 1) / 2), -((s - 1) // 2))
             sl_out.append(sl)
@@ -355,11 +366,12 @@ def correlate(in1, in2, mode='full', method='auto'):
         #swapped_inputs = ((mode == 'full') and (in2.size > in1.size)  # or
                           #_inputs_swap_needed(mode, in1.shape, in2.shape)
         #                  )
-        swapped_inputs = (in2.size > in1.size)
+        swapped_inputs = _inputs_swap_needed(mode, in1.shape, in2.shape)
         #swapped_inputs = False
 
-        #if swapped_inputs:
-        #    in1, in2 = in2, in1
+        if swapped_inputs:
+            print("swapping")
+            in1, in2 = in2, in1
             # if in1.dtype.kind == 'c':
             #     in1 = np.conj(in1)
             # elif in2.dtype.kind == 'c':
@@ -390,7 +402,8 @@ def correlate(in1, in2, mode='full', method='auto'):
         if swapped_inputs:
             # Reverse and conjugate to undo the effect of swapping inputs
             # z = _reverse_and_conj(z)
-            z = np.conj(z)
+            # z = np.conj(z)
+            pass
 
         return z
 
@@ -1681,6 +1694,10 @@ def convolve2d(in1, in2, mode='full', boundary='fill', fillvalue=0):
 
     if _inputs_swap_needed(mode, in1.shape, in2.shape):
         in1, in2 = in2, in1
+    if in1.dtype != in2.dtype:
+        dtype = np.promote_types(in1.dtype, in2.dtype)
+        in1 = in1.astype(dtype, copy=False)
+        in2 = in2.astype(dtype, copy=False)
     out = _convolveND(
         in1, in2, mode=mode, boundary=boundary, fillvalue=fillvalue
     )
@@ -1772,11 +1789,19 @@ def correlate2d(in1, in2, mode='full', boundary='fill', fillvalue=0):
         raise ValueError('correlate2d inputs must both be 2-D arrays')
 
     swapped_inputs = _inputs_swap_needed(mode, in1.shape, in2.shape)
+
+    in2 = in2[::-1, ::-1]
+    if in2.dtype.kind == 'c':
+        in2 = in2.conj()
     if swapped_inputs:
         in1, in2 = in2, in1
 
+    if in1.dtype != in2.dtype:
+        dtype = np.promote_types(in1.dtype, in2.dtype)
+        in1 = in1.astype(dtype, copy=False)
+        in2 = in2.astype(dtype, copy=False)
     out = _convolveND(
-        in1, in2[::-1, ::-1].conj(), mode=mode, boundary=boundary, fillvalue=fillvalue
+        in1, in2, mode=mode, boundary=boundary, fillvalue=fillvalue
     )
 
     # val = _valfrommode(mode)
