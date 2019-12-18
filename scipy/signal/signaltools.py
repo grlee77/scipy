@@ -367,7 +367,7 @@ def correlate(in1, in2, mode='full', method='auto'):
                           #_inputs_swap_needed(mode, in1.shape, in2.shape)
         #                  )
         swapped_inputs = _inputs_swap_needed(mode, in1.shape, in2.shape)
-        #swapped_inputs = False
+
 
         if swapped_inputs:
             print("swapping")
@@ -399,11 +399,10 @@ def correlate(in1, in2, mode='full', method='auto'):
 
         #     z = sigtools._correlateND(in1zpadded, in2, out, val)
 
-        if swapped_inputs:
-            # Reverse and conjugate to undo the effect of swapping inputs
-            # z = _reverse_and_conj(z)
-            # z = np.conj(z)
-            pass
+        # if swapped_inputs:
+        #     # Reverse and conjugate to undo the effect of swapping inputs
+        #     # z = _reverse_and_conj(z)
+        #     # z = np.conj(z)
 
         return z
 
@@ -1795,7 +1794,6 @@ def correlate2d(in1, in2, mode='full', boundary='fill', fillvalue=0):
         in2 = in2.conj()
     if swapped_inputs:
         in1, in2 = in2, in1
-
     if in1.dtype != in2.dtype:
         dtype = np.promote_types(in1.dtype, in2.dtype)
         in1 = in1.astype(dtype, copy=False)
