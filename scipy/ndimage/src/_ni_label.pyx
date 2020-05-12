@@ -162,6 +162,21 @@ cdef inline np.uintp_t take_label_or_merge(np.uintp_t cur_label,
     return cur_label
 
 
+cdef inline np.uintp_t take_label_or_merge2(np.uintp_t cur_label,
+                                            np.uintp_t neighbor_label,
+                                            np.uintp_t cur_val,
+                                            np.uintp_t neighbor_val,
+                                            np.uintp_t *mergetable) nogil:
+    if neighbor_label == BACKGROUND:
+        return cur_label
+    if (cur_label == FOREGROUND) and (cur_val == neighbor_val):
+        return neighbor_label  # neighbor is not BACKGROUND
+    if neighbor_label:
+        if (cur_label != neighbor_label) and (cur_val == neighbor_val):
+            cur_label = mark_for_merge(neighbor_label, cur_label, mergetable)
+    return cur_label
+
+
 ######################################################################
 # Label one line of input, using a neighbor line that has already been labeled.
 ######################################################################
@@ -196,12 +211,50 @@ cdef np.uintp_t label_line_with_neighbor(np.uintp_t *line,
                     next_region += 1
     return next_region
 
+
+######################################################################
+# Label one line of input, using a neighbor line that has already been labeled.
+######################################################################
+cdef np.uintp_t label_line_with_neighbor2(np.uintp_t *line,
+                                          np.uintp_t *neighbor,
+                                          np.uintp_t *line2,
+                                          np.uintp_t *neighbor2,
+                                          int neighbor_use_previous,
+                                          int neighbor_use_adjacent,
+                                          int neighbor_use_next,
+                                          np.intp_t L,
+                                          bint label_unlabeled,
+                                          bint use_previous,
+                                          np.uintp_t next_region,
+                                          np.uintp_t *mergetable) nogil:
+    cdef:
+        np.intp_t i
+
+    for i in range(L):
+        if line[i] != BACKGROUND:
+            # See allocation of line_buffer for why this is valid when i = 0
+            if neighbor_use_previous:
+                line[i] = take_label_or_merge2(line[i], neighbor[i - 1], line2[i], neighbor2[i - 1], mergetable)
+            if neighbor_use_adjacent:
+                line[i] = take_label_or_merge2(line[i], neighbor[i], line2[i], neighbor2[i], mergetable)
+            if neighbor_use_next:
+                line[i] = take_label_or_merge2(line[i], neighbor[i + 1], line2[i], neighbor2[i + 1], mergetable)
+            if label_unlabeled:
+                if use_previous:
+                    line[i] = take_label_or_merge2(line[i], line[i - 1], line2[i], line2[i - 1], mergetable)
+                if line[i] == FOREGROUND:  # still needs a label
+                    line[i] = next_region
+                    mergetable[next_region] = next_region
+                    next_region += 1
+    return next_region
+
 ######################################################################
 # Label regions
 ######################################################################
 cpdef _label(np.ndarray input,
              np.ndarray structure,
-             np.ndarray output):
+             np.ndarray output,
+             bint binary_label):
     # check dimensions
     # To understand the need for the casts to object, see
     # http://trac.cython.org/cython_trac/ticket/302
@@ -249,10 +302,14 @@ cpdef _label(np.ndarray input,
         np.intp_t L, delta, i
         np.intp_t si, so, ss
         np.intp_t total_offset
+        np.intp_t total_offset_in
         bint needs_self_labeling, valid, center, use_previous, overflowed
         np.ndarray _line_buffer, _neighbor_buffer
+        np.ndarray _line_val_buffer, _neighbor_val_buffer
         np.uintp_t *line_buffer
         np.uintp_t *neighbor_buffer
+        np.uintp_t *line_val_buffer
+        np.uintp_t *neighbor_val_buffer
         np.uintp_t *tmp
         np.uintp_t next_region, src_label, dest_label
         np.uintp_t mergetable_size
@@ -278,6 +335,14 @@ cpdef _label(np.ndarray input,
     _neighbor_buffer = np.empty(L + 2, dtype=np.uintp)
     line_buffer = <np.uintp_t *> _line_buffer.data
     neighbor_buffer = <np.uintp_t *> _neighbor_buffer.data
+
+    if not binary_label:
+        _line_val_buffer = np.empty(L + 2, dtype=np.uintp)
+        _neighbor_val_buffer = np.empty(L + 2, dtype=np.uintp)
+        # note intp values will get changed to uintp, but this should be okay
+        # (doesn't matter if the actual values get modified by wrapping)
+        line_val_buffer = <np.uintp_t *> _line_val_buffer.data
+        neighbor_val_buffer = <np.uintp_t *> _neighbor_val_buffer.data
 
     # Add fenceposts with background values
     line_buffer[0] = neighbor_buffer[0] = BACKGROUND
@@ -317,6 +382,9 @@ cpdef _label(np.ndarray input,
 
                 # copy nonzero values in input to line_buffer as FOREGROUND
                 nonzero_line(PyArray_ITER_DATA(iti), si, line_buffer, L)
+                if not binary_label:
+                    # copy original values into buffer
+                    read_line(PyArray_ITER_DATA(iti), si, line_val_buffer, L)
 
                 needs_self_labeling = True
 
@@ -335,6 +403,7 @@ cpdef _label(np.ndarray input,
                     # Check that the neighbor line is in bounds
                     valid = True
                     total_offset = 0
+                    total_offset_in = 0
                     for idim in range(structure.ndim):
                         if idim == axis:
                             continue
@@ -343,6 +412,7 @@ cpdef _label(np.ndarray input,
                             valid = False
                             break
                         total_offset += delta * output.strides[idim]
+                        total_offset_in += delta * input.strides[idim]
 
                     if valid:
                         # Optimization (see above) - for 2D, line_buffer
@@ -351,6 +421,10 @@ cpdef _label(np.ndarray input,
                         if output.ndim != 2:
                             read_line(<char *> PyArray_ITER_DATA(ito) + total_offset, so,
                                       neighbor_buffer, L)
+                        if not binary_label:
+                            # copy neighbor values into buffer
+                            read_line(<char *> PyArray_ITER_DATA(iti) + total_offset_in, si,
+                                      neighbor_val_buffer, L)
 
                         # be conservative about how much space we may need
                         while mergetable_size < (next_region + L):
@@ -359,16 +433,30 @@ cpdef _label(np.ndarray input,
                                 PyDataMem_RENEW(<void *> mergetable,
                                                  mergetable_size * sizeof(np.uintp_t))
 
-                        next_region = label_line_with_neighbor(line_buffer,
-                                                              neighbor_buffer,
-                                                              neighbor_use_prev,
-                                                              neighbor_use_adjacent,
-                                                              neighbor_use_next,
-                                                              L,
-                                                              ni == (num_neighbors - 1),
-                                                              use_previous,
-                                                              next_region,
-                                                              mergetable)
+                        if binary_label:
+                            next_region = label_line_with_neighbor(line_buffer,
+                                                                  neighbor_buffer,
+                                                                  neighbor_use_prev,
+                                                                  neighbor_use_adjacent,
+                                                                  neighbor_use_next,
+                                                                  L,
+                                                                  ni == (num_neighbors - 1),
+                                                                  use_previous,
+                                                                  next_region,
+                                                                  mergetable)
+                        else:
+                            next_region = label_line_with_neighbor2(line_buffer,
+                                                                  neighbor_buffer,
+                                                                  line_val_buffer,
+                                                                  neighbor_val_buffer,
+                                                                  neighbor_use_prev,
+                                                                  neighbor_use_adjacent,
+                                                                  neighbor_use_next,
+                                                                  L,
+                                                                  ni == (num_neighbors - 1),
+                                                                  use_previous,
+                                                                  next_region,
+                                                                  mergetable)
                         if ni == (num_neighbors - 1):
                             needs_self_labeling = False
                     PyArray_ITER_NEXT(itstruct)
@@ -383,14 +471,26 @@ cpdef _label(np.ndarray input,
                                 PyDataMem_RENEW(<void *> mergetable,
                                                  mergetable_size * sizeof(np.uintp_t))
 
-                    next_region = label_line_with_neighbor(line_buffer,
-                                                          neighbor_buffer,
-                                                          False, False, False,  # no neighbors
-                                                          L,
-                                                          True,
-                                                          use_previous,
-                                                          next_region,
-                                                          mergetable)
+                    if binary_label:
+                        next_region = label_line_with_neighbor(line_buffer,
+                                                               neighbor_buffer,
+                                                               False, False, False,  # no neighbors
+                                                               L,
+                                                               True,
+                                                               use_previous,
+                                                               next_region,
+                                                               mergetable)
+                    else:
+                        next_region = label_line_with_neighbor2(line_buffer,
+                                                                neighbor_buffer,
+                                                                line_val_buffer,
+                                                                neighbor_val_buffer,
+                                                                False, False, False,  # no neighbors
+                                                                L,
+                                                                True,
+                                                                use_previous,
+                                                                next_region,
+                                                                mergetable)
 
                 overflowed = write_line(PyArray_ITER_DATA(ito), so,
                                         line_buffer, L)

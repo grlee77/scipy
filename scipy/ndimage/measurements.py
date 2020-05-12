@@ -41,7 +41,7 @@ __all__ = ['label', 'find_objects', 'labeled_comprehension', 'sum', 'mean',
            'histogram', 'watershed_ift']
 
 
-def label(input, structure=None, output=None):
+def label(input, structure=None, output=None, binary_label=True):
     """
     Label features in an array.
 
@@ -216,12 +216,12 @@ def label(input, structure=None, output=None):
             return output, maxlabel
 
     try:
-        max_label = _ni_label._label(input, structure, output)
+        max_label = _ni_label._label(input, structure, output, binary_label)
     except _ni_label.NeedMoreBits:
         # Make another attempt with enough bits, then try to cast to the
         # new type.
         tmp_output = np.empty(input.shape, np.intp if need_64bits else np.int32)
-        max_label = _ni_label._label(input, structure, tmp_output)
+        max_label = _ni_label._label(input, structure, tmp_output, binary_label)
         output[...] = tmp_output[...]
         if not np.all(output == tmp_output):
             # refuse to return bad results
@@ -1203,7 +1203,7 @@ def maximum_position(input, labels=None, index=None):
     --------
     label, minimum, median, maximum_position, extrema, sum, mean, variance,
     standard_deviation
-    
+
     Examples
     --------
     >>> from scipy import ndimage
@@ -1222,14 +1222,14 @@ def maximum_position(input, labels=None, index=None):
     ...                 [0, 1, 2, 3]])
     >>> ndimage.maximum_position(a, lbl, 1)
     (1, 1)
-    
+
     If no index is given, non-zero `labels` are processed:
 
     >>> ndimage.maximum_position(a, lbl)
     (2, 3)
-    
+
     If there are no maxima, the position of the first element is returned:
-    
+
     >>> ndimage.maximum_position(a, lbl, 2)
     (0, 2)
 
