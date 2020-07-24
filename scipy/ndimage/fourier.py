@@ -248,6 +248,12 @@ def fourier_ellipsoid(input, size, n=-1, axis=-1, output=None):
     return output
 
 
+def _reshape_nd(arr, ndim, axis):
+    """Promote a 1d array to ndim with size > 1 at the specified axis."""
+    nd_shape = (1,) * axis + (arr.size,) + (1,) * (ndim - axis - 1)
+    return arr.reshape(nd_shape)
+
+
 def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     """
     Multidimensional Fourier shift filter.
@@ -298,8 +304,30 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     output = _get_output_fourier_complex(output, input)
     axis = normalize_axis_index(axis, input.ndim)
     shifts = _ni_support._normalize_sequence(shift, input.ndim)
-    shifts = numpy.asarray(shifts, dtype=numpy.float64)
-    if not shifts.flags.contiguous:
-        shifts = shifts.copy()
-    _nd_image.fourier_shift(input, shifts, n, axis, output)
+    ndim = input.ndim
+
+    if ndim == 1:
+        shifts = numpy.asarray(shifts, dtype=numpy.float64)
+        if not shifts.flags.contiguous:
+            shifts = shifts.copy()
+        _nd_image.fourier_shift(input, shifts, n, axis, output)
+        return output
+
+    output[...] = input
+    for ax, (shiftk, ax_size) in enumerate(zip(shifts, output.shape)):
+        if shiftk == 0:
+            continue
+        if ax == axis and n > 0:
+            # cp.fft.rfftfreq(ax_size) * (-2j * np.pi * shiftk *  ax_size / n)
+            arr = numpy.arange(ax_size, dtype=output.dtype)
+            arr *= -2j * numpy.pi * shiftk / n
+        else:
+            arr = numpy.fft.fftfreq(ax_size)
+            arr = arr * (-2j * numpy.pi * shiftk)
+        numpy.exp(arr, out=arr)
+
+        # reshape for broadcasting
+        arr = _reshape_nd(arr, ndim=ndim, axis=ax)
+        output *= arr
+
     return output
