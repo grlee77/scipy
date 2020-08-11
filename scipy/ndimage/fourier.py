@@ -56,6 +56,12 @@ def _get_output_fourier(output, input, complex_only=False):
     return output
 
 
+def _reshape_nd(arr, ndim, axis):
+    """Promote a 1d array to ndim with non-singleton size along axis."""
+    nd_shape = (1,) * axis + (arr.size,) + (1,) * (ndim - axis - 1)
+    return arr.reshape(nd_shape)
+
+
 def fourier_gaussian(input, sigma, n=-1, axis=-1, output=None):
     """
     Multidimensional Gaussian fourier filter.
@@ -104,14 +110,32 @@ def fourier_gaussian(input, sigma, n=-1, axis=-1, output=None):
     >>> plt.show()
     """
     input = numpy.asarray(input)
+    ndim = input.ndim
     output = _get_output_fourier(output, input)
-    axis = normalize_axis_index(axis, input.ndim)
-    sigmas = _ni_support._normalize_sequence(sigma, input.ndim)
-    sigmas = numpy.asarray(sigmas, dtype=numpy.float64)
-    if not sigmas.flags.contiguous:
-        sigmas = sigmas.copy()
+    axis = normalize_axis_index(axis, ndim)
+    sigmas = _ni_support._normalize_sequence(sigma, ndim)
 
-    _nd_image.fourier_filter(input, sigmas, n, axis, output, 0)
+    output[...] = input
+    for ax, (sigmak, ax_size) in enumerate(zip(sigmas, output.shape)):
+
+        # compute the frequency grid in Hz
+        if ax == axis and n > 0:
+            arr = numpy.arange(ax_size, dtype=output.real.dtype)
+            arr /= n
+        else:
+            arr = numpy.fft.fftfreq(ax_size)
+        arr = arr.astype(output.real.dtype, copy=False)
+
+        # compute the Gaussian weights
+        arr *= arr
+        scale = sigmak * sigmak / -2
+        arr *= (4 * numpy.pi * numpy.pi) * scale
+        numpy.exp(arr, out=arr)
+
+        # reshape for broadcasting
+        arr = _reshape_nd(arr, ndim=ndim, axis=ax)
+        output *= arr
+
     return output
 
 
@@ -163,13 +187,30 @@ def fourier_uniform(input, size, n=-1, axis=-1, output=None):
     >>> plt.show()
     """
     input = numpy.asarray(input)
+    ndim = input.ndim
     output = _get_output_fourier(output, input)
-    axis = normalize_axis_index(axis, input.ndim)
-    sizes = _ni_support._normalize_sequence(size, input.ndim)
-    sizes = numpy.asarray(sizes, dtype=numpy.float64)
-    if not sizes.flags.contiguous:
-        sizes = sizes.copy()
-    _nd_image.fourier_filter(input, sizes, n, axis, output, 1)
+    axis = normalize_axis_index(axis, ndim)
+    sizes = _ni_support._normalize_sequence(size, ndim)
+
+    output[...] = input
+    for ax, (size, ax_size) in enumerate(zip(sizes, output.shape)):
+
+        # compute the frequency grid in Hz
+        if ax == axis and n > 0:
+            arr = numpy.arange(ax_size, dtype=output.real.dtype)
+            arr /= n
+        else:
+            arr = numpy.fft.fftfreq(ax_size)
+        arr = arr.astype(output.real.dtype, copy=False)
+
+        # compute the uniform filter weights
+        arr *= size
+        arr = numpy.sinc(arr)
+
+        # reshape for broadcasting
+        arr = _reshape_nd(arr, ndim=ndim, axis=ax)
+        output *= arr
+
     return output
 
 
@@ -282,11 +323,26 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     >>> plt.show()
     """
     input = numpy.asarray(input)
+    ndim = input.ndim
     output = _get_output_fourier(output, input, complex_only=True)
-    axis = normalize_axis_index(axis, input.ndim)
-    shifts = _ni_support._normalize_sequence(shift, input.ndim)
-    shifts = numpy.asarray(shifts, dtype=numpy.float64)
-    if not shifts.flags.contiguous:
-        shifts = shifts.copy()
-    _nd_image.fourier_shift(input, shifts, n, axis, output)
+    axis = normalize_axis_index(axis, ndim)
+    shifts = _ni_support._normalize_sequence(shift, ndim)
+
+    output[...] = input
+    for ax, (shiftk, ax_size) in enumerate(zip(shifts, output.shape)):
+        if shiftk == 0:
+            continue
+        if ax == axis and n > 0:
+            # cp.fft.rfftfreq(ax_size) * (-2j * numpy.pi * shiftk *  ax_size/n)
+            arr = numpy.arange(ax_size, dtype=output.dtype)
+            arr *= -2j * numpy.pi * shiftk / n
+        else:
+            arr = numpy.fft.fftfreq(ax_size)
+            arr = arr * (-2j * numpy.pi * shiftk)
+        numpy.exp(arr, out=arr)
+
+        # reshape for broadcasting
+        arr = _reshape_nd(arr, ndim=ndim, axis=ax)
+        output *= arr
+
     return output
