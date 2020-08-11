@@ -34,7 +34,5 @@
 
 int NI_FourierFilter(PyArrayObject*, PyArrayObject*, npy_intp, int,
                                          PyArrayObject*, int);
-int NI_FourierShift(PyArrayObject*, PyArrayObject*, npy_intp, int,
-                                        PyArrayObject*);
 
 #endif

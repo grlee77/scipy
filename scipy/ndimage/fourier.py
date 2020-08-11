@@ -272,7 +272,7 @@ def fourier_ellipsoid(input, size, n=-1, axis=-1, output=None):
     sizes = numpy.asarray(sizes, dtype=numpy.float64)
     if not sizes.flags.contiguous:
         sizes = sizes.copy()
-    _nd_image.fourier_filter(input, sizes, n, axis, output, 2)
+    _nd_image.fourier_filter(input, sizes, n, axis, output, 0)
     return output
 
 

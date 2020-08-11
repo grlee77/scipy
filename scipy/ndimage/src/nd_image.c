@@ -634,31 +634,6 @@ exit:
     return PyErr_Occurred() ? NULL : Py_BuildValue("");
 }
 
-static PyObject *Py_FourierShift(PyObject *obj, PyObject *args)
-{
-    PyArrayObject *input = NULL, *output = NULL, *shifts = NULL;
-    int axis;
-    npy_intp n;
-
-    if (!PyArg_ParseTuple(args, "O&O&niO&",
-                          NI_ObjectToInputArray, &input,
-                          NI_ObjectToInputArray, &shifts,
-                          &n, &axis,
-                          NI_ObjectToOutputArray, &output))
-        goto exit;
-
-    NI_FourierShift(input, shifts, n, axis, output);
-    #ifdef HAVE_WRITEBACKIFCOPY
-        PyArray_ResolveWritebackIfCopy(output);
-    #endif
-
-exit:
-    Py_XDECREF(input);
-    Py_XDECREF(shifts);
-    Py_XDECREF(output);
-    return PyErr_Occurred() ? NULL : Py_BuildValue("");
-}
-
 static PyObject *Py_SplineFilter1D(PyObject *obj, PyObject *args)
 {
     PyArrayObject *input = NULL, *output = NULL;
@@ -1137,8 +1112,6 @@ static PyMethodDef methods[] = {
     {"generic_filter1d",      (PyCFunction)Py_GenericFilter1D,
      METH_VARARGS, NULL},
     {"fourier_filter",        (PyCFunction)Py_FourierFilter,
-     METH_VARARGS, NULL},
-    {"fourier_shift",         (PyCFunction)Py_FourierShift,
      METH_VARARGS, NULL},
     {"spline_filter1d",       (PyCFunction)Py_SplineFilter1D,
      METH_VARARGS, NULL},
