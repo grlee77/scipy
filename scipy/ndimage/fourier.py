@@ -37,31 +37,18 @@ __all__ = ['fourier_gaussian', 'fourier_uniform', 'fourier_ellipsoid',
            'fourier_shift']
 
 
-def _get_output_fourier(output, input):
+def _get_output_fourier(output, input, complex_only=False):
+    types = [numpy.complex64, numpy.complex128]
+    if not complex_only:
+        types += [numpy.float32, numpy.float64]
+
     if output is None:
-        if input.dtype.type in [numpy.complex64, numpy.complex128,
-                                numpy.float32]:
+        if input.dtype in types:
             output = numpy.zeros(input.shape, dtype=input.dtype)
         else:
-            output = numpy.zeros(input.shape, dtype=numpy.float64)
+            output = numpy.zeros(input.shape, dtype=types[-1])
     elif type(output) is type:
-        if output not in [numpy.complex64, numpy.complex128,
-                          numpy.float32, numpy.float64]:
-            raise RuntimeError("output type not supported")
-        output = numpy.zeros(input.shape, dtype=output)
-    elif output.shape != input.shape:
-        raise RuntimeError("output shape not correct")
-    return output
-
-
-def _get_output_fourier_complex(output, input):
-    if output is None:
-        if input.dtype.type in [numpy.complex64, numpy.complex128]:
-            output = numpy.zeros(input.shape, dtype=input.dtype)
-        else:
-            output = numpy.zeros(input.shape, dtype=numpy.complex128)
-    elif type(output) is type:
-        if output not in [numpy.complex64, numpy.complex128]:
+        if output not in types:
             raise RuntimeError("output type not supported")
         output = numpy.zeros(input.shape, dtype=output)
     elif output.shape != input.shape:
@@ -295,7 +282,7 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     >>> plt.show()
     """
     input = numpy.asarray(input)
-    output = _get_output_fourier_complex(output, input)
+    output = _get_output_fourier(output, input, complex_only=True)
     axis = normalize_axis_index(axis, input.ndim)
     shifts = _ni_support._normalize_sequence(shift, input.ndim)
     shifts = numpy.asarray(shifts, dtype=numpy.float64)
