@@ -62,6 +62,16 @@ map_coordinate(double in, npy_intp len, int mode)
                 in = in < -len ? in + sz2 : -in - 1;
             }
             break;
+        case NI_EXTEND_REFLECT_GRID:
+            if (len <= 1) {
+                in = 0;
+            } else {
+                npy_intp sz2 = 2 * len;
+                in = -1 - in;
+                in -= sz2 * (npy_intp)(in / sz2);  // in %= sz2;
+                in = fmin(in, sz2 - 1 - in);
+            }
+            break;
         case NI_EXTEND_WRAP:
             if (len <= 1) {
                 in = 0;
@@ -70,6 +80,15 @@ map_coordinate(double in, npy_intp len, int mode)
                 // Integer division of -in/sz gives (-in mod sz)
                 // Note that 'in' is negative
                 in += sz * ((npy_intp)(-in / sz) + 1);
+            }
+            break;
+        case NI_EXTEND_WRAP_GRID:
+            if (len <= 1) {
+                in = 0;
+            } else {
+                // Integer division of -in/len gives (-in mod len)
+                // Note that 'in' is negative
+                in += len * ((npy_intp)(-in / len) + 1);
             }
             break;
         case NI_EXTEND_NEAREST:
@@ -101,12 +120,28 @@ map_coordinate(double in, npy_intp len, int mode)
                     in = sz2 - in - 1;
             }
             break;
+        case NI_EXTEND_REFLECT_GRID:
+            if (len <= 1) {
+                in = 0;
+            } else {
+                npy_intp sz2 = 2 * len;
+                in -= sz2 * (npy_intp)(in / sz2);  // in %= sz2;
+                in = fmin(in, sz2 - 1 - in);
+            }
+            break;
         case NI_EXTEND_WRAP:
             if (len <= 1) {
                 in = 0;
             } else {
                 npy_intp sz = len - 1;
                 in -= sz * (npy_intp)(in / sz);
+            }
+            break;
+        case NI_EXTEND_WRAP_GRID:
+            if (len <= 1) {
+                in = 0;
+            } else {
+                in -= len * (npy_intp)(in / len);
             }
             break;
         case NI_EXTEND_NEAREST:
@@ -437,6 +472,7 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                                     idx = s2 - idx;
                             }
                         }
+
                         /* calculate and store the offests at this edge: */
                         edge_offsets[hh][ll] = istrides[hh] * (idx - start);
                     }
