@@ -441,7 +441,8 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
         /* iterate over axes: */
         for(hh = 0; hh < irank; hh++) {
             /* if the input coordinate is outside the borders, map it: */
-            double cc = map_coordinate(icoor[hh], idimensions[hh], mode);
+            npy_intp len = idimensions[hh];
+            double cc = map_coordinate(icoor[hh], len, mode);
             if (cc > -1.0) {
                 /* find the filter location along this axis: */
                 npy_intp start;
@@ -452,28 +453,32 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                 }
                 /* get the offset to the start of the filter: */
                 offset += istrides[hh] * start;
-                if (start < 0 || start + order >= idimensions[hh]) {
+                if (start < 0 || start + order >= len) {
                     /* implement border mapping, if outside border: */
                     edge = 1;
                     edge_offsets[hh] = data_offsets[hh];
-                    for(ll = 0; ll <= order; ll++) {
-                        npy_intp idx = start + ll;
-                        npy_intp len = idimensions[hh];
-                        if (len <= 1) {
-                            idx = 0;
-                        } else {
-                            npy_intp s2 = 2 * len - 2;
-                            if (idx < 0) {
-                                idx = s2 * (-idx / s2) + idx;
-                                idx = idx <= 1 - len ? idx + s2 : -idx;
-                            } else if (idx >= len) {
-                                idx -= s2 * (idx / s2);
-                                if (idx >= len)
-                                    idx = s2 - idx;
-                            }
-                        }
 
-                        /* calculate and store the offests at this edge: */
+                    for(ll = 0; ll <= order; ll++) {
+                        // npy_intp idx = start + ll;
+                        // npy_intp len = idimensions[hh];
+
+                        // // Note: This code block is for mirror boundary conditions
+                        // if (len <= 1) {
+                        //     idx = 0;
+                        // } else {
+                        //     npy_intp s2 = 2 * len - 2;
+                        //     if (idx < 0) {
+                        //         idx = s2 * (-idx / s2) + idx;
+                        //         idx = idx <= 1 - len ? idx + s2 : -idx;
+                        //     } else if (idx >= len) {
+                        //         idx -= s2 * (idx / s2);
+                        //         if (idx >= len)
+                        //             idx = s2 - idx;
+                        //     }
+                        // }
+                        idx = (npy_intp)map_coordinate(start + ll, len, NI_EXTEND_MIRROR);
+
+                        /* calculate and store the offsets at this edge: */
                         edge_offsets[hh][ll] = istrides[hh] * (idx - start);
                     }
                 } else {
