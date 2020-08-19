@@ -475,9 +475,14 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                         //             idx = s2 - idx;
                         //     }
                         // }
-                        if (order < 2)
+                        if (order < 0)
                         {
                             idx = (npy_intp)map_coordinate(idx, len, mode);
+                            if (idx < 0)
+                            {
+                                constant = 1;
+                                edge = 0;
+                            }
                         } else {
                             idx = (npy_intp)map_coordinate(idx, len, NI_EXTEND_MIRROR);
                         }
