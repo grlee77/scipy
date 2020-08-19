@@ -86,9 +86,8 @@ map_coordinate(double in, npy_intp len, int mode)
             if (len <= 1) {
                 in = 0;
             } else {
-                // Integer division of -in/len gives (-in mod len)
-                // Note that 'in' is negative
-                in += len * ((npy_intp)(-in / len) + 1);
+                // in = len - 1 + fmod(in + 1, len);
+                in += len * ((npy_intp)((-1 - in) / len) + 1);
             }
             break;
         case NI_EXTEND_NEAREST:
@@ -459,7 +458,7 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                     edge_offsets[hh] = data_offsets[hh];
 
                     for(ll = 0; ll <= order; ll++) {
-                        // npy_intp idx = start + ll;
+                        npy_intp idx = start + ll;
                         // npy_intp len = idimensions[hh];
 
                         // // Note: This code block is for mirror boundary conditions
@@ -476,7 +475,12 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                         //             idx = s2 - idx;
                         //     }
                         // }
-                        idx = (npy_intp)map_coordinate(start + ll, len, NI_EXTEND_MIRROR);
+                        if (order < 2)
+                        {
+                            idx = (npy_intp)map_coordinate(idx, len, mode);
+                        } else {
+                            idx = (npy_intp)map_coordinate(idx, len, NI_EXTEND_MIRROR);
+                        }
 
                         /* calculate and store the offsets at this edge: */
                         edge_offsets[hh][ll] = istrides[hh] * (idx - start);
