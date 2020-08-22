@@ -62,16 +62,6 @@ map_coordinate(double in, npy_intp len, int mode)
                 in = in < -len ? in + sz2 : -in - 1;
             }
             break;
-        case NI_EXTEND_REFLECT_GRID:
-            if (len <= 1) {
-                in = 0;
-            } else {
-                npy_intp sz2 = 2 * len;
-                in = -1 - in;
-                in -= sz2 * (npy_intp)(in / sz2);  // in %= sz2;
-                in = fmin(in, sz2 - 1 - in);
-            }
-            break;
         case NI_EXTEND_WRAP:
             if (len <= 1) {
                 in = 0;
@@ -117,15 +107,6 @@ map_coordinate(double in, npy_intp len, int mode)
                 in -= sz2 * (npy_intp)(in / sz2);
                 if (in >= len)
                     in = sz2 - in - 1;
-            }
-            break;
-        case NI_EXTEND_REFLECT_GRID:
-            if (len <= 1) {
-                in = 0;
-            } else {
-                npy_intp sz2 = 2 * len;
-                in -= sz2 * (npy_intp)(in / sz2);  // in %= sz2;
-                in = fmin(in, sz2 - 1 - in);
             }
             break;
         case NI_EXTEND_WRAP:
@@ -475,7 +456,7 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                         //             idx = s2 - idx;
                         //     }
                         // }
-                        if (mode != NI_EXTEND_CONSTANT)
+                        if ((mode != NI_EXTEND_CONSTANT) && (mode != NI_EXTEND_WRAP))
                         {
                             idx = (npy_intp)map_coordinate(idx, len, mode);
                         } else {

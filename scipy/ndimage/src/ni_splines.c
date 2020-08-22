@@ -290,16 +290,17 @@ apply_filter(double *coefficients, const npy_intp len, const double *poles,
     init_fn *anticausal;
 
     switch(mode) {
-        case NI_EXTEND_NEAREST:
         case NI_EXTEND_CONSTANT:
         case NI_EXTEND_MIRROR:
+        case NI_EXTEND_WRAP:  /* TODO: remove this case? */
             causal = &_init_causal_mirror;
             anticausal = &_init_anticausal_mirror;
             break;
-        case NI_EXTEND_WRAP:
+        case NI_EXTEND_WRAP_GRID:
             causal = &_init_causal_wrap;
             anticausal = &_init_anticausal_wrap;
             break;
+        case NI_EXTEND_NEAREST:
         case NI_EXTEND_REFLECT:
             causal = &_init_causal_reflect;
             anticausal = &_init_anticausal_reflect;

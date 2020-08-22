@@ -372,13 +372,14 @@ def map_coordinates(input, coordinates, output=None, order=3,
         raise RuntimeError('input and output rank must be > 0')
     if coordinates.shape[0] != input.ndim:
         raise RuntimeError('invalid shape for coordinate array')
-    mode = _ni_support._extend_mode_to_code(mode)
     if prefilter and order > 1:
-        filtered = spline_filter(input, order, output=numpy.float64)
+        filtered = spline_filter(input, order, output=numpy.float64,
+                                 mode=mode)
     else:
         filtered = input
     output = _ni_support._get_output(output, input,
                                      shape=output_shape)
+    mode = _ni_support._extend_mode_to_code(mode)
     _nd_image.geometric_transform(filtered, None, coordinates, None, None,
                                   output, order, mode, cval, None, None)
     return output
