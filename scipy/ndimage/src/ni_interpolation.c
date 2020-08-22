@@ -456,7 +456,10 @@ NI_GeometricTransform(PyArrayObject *input, int (*map)(npy_intp*, double*,
                         //             idx = s2 - idx;
                         //     }
                         // }
-                        if ((mode != NI_EXTEND_CONSTANT) && (mode != NI_EXTEND_WRAP))
+                        if (mode == NI_EXTEND_NEAREST){
+                            idx = (npy_intp)map_coordinate(idx, len, NI_EXTEND_REFLECT);
+                        }
+                        else if ((mode != NI_EXTEND_CONSTANT) && (mode != NI_EXTEND_WRAP))
                         {
                             idx = (npy_intp)map_coordinate(idx, len, mode);
                         } else {
