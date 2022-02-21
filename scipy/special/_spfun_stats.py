@@ -32,6 +32,8 @@
 """Some more special functions which may be useful for multivariate statistical
 analysis."""
 
+import math
+
 import numpy as np
 from scipy.special import gammaln as loggam
 
@@ -95,12 +97,14 @@ def multigammaln(a, d):
     454.1488605074416
     """
     a = np.asarray(a)
-    if not np.isscalar(d) or (np.floor(d) != d):
+    if not np.isscalar(d) or (math.floor(d) != d):
         raise ValueError("d should be a positive integer (dimension)")
     if np.any(a <= 0.5 * (d - 1)):
         raise ValueError("condition a (%f) > 0.5 * (d-1) (%f) not met"
                          % (a, 0.5 * (d-1)))
 
-    res = (d * (d-1) * 0.25) * np.log(np.pi)
-    res += np.sum(loggam([(a - (j - 1.)/2) for j in range(1, d+1)]), axis=0)
+    res = (d * (d - 1) * 0.25) * math.log(math.pi)
+    res = res + loggam(a)
+    for j in range(2, d + 1):
+        res += loggam(a - (j - 1.)/2)
     return res
