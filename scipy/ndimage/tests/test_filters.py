@@ -1503,6 +1503,65 @@ class TestNdimageFilters:
                                      origin=[-1, 0])
         assert_array_almost_equal(expected, output)
 
+    @pytest.mark.parametrize(
+        'axes', tuple(itertools.combinations(range(-3, 3), 2))
+    )
+    @pytest.mark.parametrize(
+        'func, func_kwargs',
+        [
+            (ndimage.rank_filter, dict(rank=2)),
+            (ndimage.percentile_filter, dict(percentile=30)),
+            (ndimage.median_filter, {}),
+        ]
+    )
+    def test_rank_axes(self, func, func_kwargs, axes):
+        array = numpy.arange(6 * 8 * 12, dtype=numpy.int32).reshape(6, 8, 12)
+
+        size = 3
+        axes = tuple(ax % array.ndim for ax in axes)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                func(array, size=size, axes=axes, **func_kwargs)
+            return
+        output = func(array, size=size, axes=axes, **func_kwargs)
+
+        # result should be equivalent to size=1 on any unfiltered axes
+        all_sizes = tuple(
+            size if ax in axes else 1 for ax in range(array.ndim)
+        )
+        expected = func(array, size=all_sizes, **func_kwargs)
+        assert_allclose(output, expected)
+
+    @pytest.mark.parametrize(
+        'axes', tuple(itertools.combinations(range(-3, 3), 2))
+    )
+    @pytest.mark.parametrize(
+        'func, func_kwargs',
+        [
+            (ndimage.rank_filter, dict(rank=2)),
+            (ndimage.percentile_filter, dict(percentile=30)),
+            (ndimage.median_filter, {}),
+        ]
+    )
+    def test_rank_footprint_axes(self, func, func_kwargs, axes):
+        array = numpy.arange(6 * 8 * 12, dtype=numpy.int32).reshape(6, 8, 12)
+
+        axes = tuple(ax % array.ndim for ax in axes)
+        footprint = numpy.tri(5)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                func(array, footprint=footprint, axes=axes, **func_kwargs)
+            return
+        output = func(array, footprint=footprint, axes=axes, **func_kwargs)
+
+        # insert singleton dimension on any unfiltered axes
+        missing_axis = tuple(set(range(3)) - set(axes))[0]
+        footprint_3d = numpy.expand_dims(footprint, missing_axis)
+        expected = func(array, footprint=footprint_3d, **func_kwargs)
+        assert_allclose(output, expected)
+
     @pytest.mark.parametrize('dtype', types)
     def test_generic_filter1d01(self, dtype):
         weights = numpy.array([1.1, 2.2, 3.3])
