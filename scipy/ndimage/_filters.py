@@ -459,7 +459,8 @@ def sobel(input, axis=-1, output=None, mode="reflect", cval=0.0):
 def generic_laplace(input, derivative2, output=None, mode="reflect",
                     cval=0.0,
                     extra_arguments=(),
-                    extra_keywords=None):
+                    extra_keywords=None,
+                    *, axes=None):
     """
     N-D Laplace filter using a provided second derivative function.
 
@@ -478,12 +479,16 @@ def generic_laplace(input, derivative2, output=None, mode="reflect",
     %(cval)s
     %(extra_keywords)s
     %(extra_arguments)s
+    axes : tuple of int or None
+        The axes over which to apply the filter. If a `mode` tuple is
+        provided, its length must match the number of axes.
+
     """
     if extra_keywords is None:
         extra_keywords = {}
     input = numpy.asarray(input)
     output = _ni_support._get_output(output, input)
-    axes = list(range(input.ndim))
+    axes = _ni_support._check_axes(axes, input.ndim)
     if len(axes) > 0:
         modes = _ni_support._normalize_sequence(mode, len(axes))
         derivative2(input, axes[0], output, modes[0], cval,
@@ -498,7 +503,7 @@ def generic_laplace(input, derivative2, output=None, mode="reflect",
 
 
 @_ni_docstrings.docfiller
-def laplace(input, output=None, mode="reflect", cval=0.0):
+def laplace(input, output=None, mode="reflect", cval=0.0, *, axes=None):
     """N-D Laplace filter based on approximate second derivatives.
 
     Parameters
@@ -507,6 +512,9 @@ def laplace(input, output=None, mode="reflect", cval=0.0):
     %(output)s
     %(mode_multiple)s
     %(cval)s
+    axes : tuple of int or None
+        The axes over which to apply the filter. If a `mode` tuple is
+        provided, its length must match the number of axes.
 
     Examples
     --------
@@ -524,12 +532,12 @@ def laplace(input, output=None, mode="reflect", cval=0.0):
     """
     def derivative2(input, axis, output, mode, cval):
         return correlate1d(input, [1, -2, 1], axis, output, mode, cval, 0)
-    return generic_laplace(input, derivative2, output, mode, cval)
+    return generic_laplace(input, derivative2, output, mode, cval, axes=axes)
 
 
 @_ni_docstrings.docfiller
 def gaussian_laplace(input, sigma, output=None, mode="reflect",
-                     cval=0.0, **kwargs):
+                     cval=0.0, *, axes=None, **kwargs):
     """Multidimensional Laplace filter using Gaussian second derivatives.
 
     Parameters
@@ -542,6 +550,9 @@ def gaussian_laplace(input, sigma, output=None, mode="reflect",
     %(output)s
     %(mode_multiple)s
     %(cval)s
+    axes : tuple of int or None
+        The axes over which to apply the filter. If `sigma` or `mode` tuples
+        are provided, their length must match the number of axes.
     Extra keyword arguments will be passed to gaussian_filter().
 
     Examples
@@ -572,13 +583,15 @@ def gaussian_laplace(input, sigma, output=None, mode="reflect",
 
     return generic_laplace(input, derivative2, output, mode, cval,
                            extra_arguments=(sigma,),
-                           extra_keywords=kwargs)
+                           extra_keywords=kwargs,
+                           axes=axes)
 
 
 @_ni_docstrings.docfiller
 def generic_gradient_magnitude(input, derivative, output=None,
                                mode="reflect", cval=0.0,
-                               extra_arguments=(), extra_keywords=None):
+                               extra_arguments=(), extra_keywords=None,
+                               *, axes=None):
     """Gradient magnitude using a provided gradient function.
 
     Parameters
@@ -599,12 +612,16 @@ def generic_gradient_magnitude(input, derivative, output=None,
     %(cval)s
     %(extra_keywords)s
     %(extra_arguments)s
+    axes : tuple of int or None
+        The axes over which to apply the filter. If a `mode` tuple is
+        provided, its length must match the number of axes.
+
     """
     if extra_keywords is None:
         extra_keywords = {}
     input = numpy.asarray(input)
     output = _ni_support._get_output(output, input)
-    axes = list(range(input.ndim))
+    axes = _ni_support._check_axes(axes, input.ndim)
     if len(axes) > 0:
         modes = _ni_support._normalize_sequence(mode, len(axes))
         derivative(input, axes[0], output, modes[0], cval,
@@ -624,7 +641,8 @@ def generic_gradient_magnitude(input, derivative, output=None,
 
 @_ni_docstrings.docfiller
 def gaussian_gradient_magnitude(input, sigma, output=None,
-                                mode="reflect", cval=0.0, **kwargs):
+                                mode="reflect", cval=0.0, *, axes=None,
+                                **kwargs):
     """Multidimensional gradient magnitude using Gaussian derivatives.
 
     Parameters
@@ -637,6 +655,9 @@ def gaussian_gradient_magnitude(input, sigma, output=None,
     %(output)s
     %(mode_multiple)s
     %(cval)s
+    axes : tuple of int or None
+        The axes over which to apply the filter. If `sigma` or `mode` tuples
+        are provided, their length must match the number of axes.
     Extra keyword arguments will be passed to gaussian_filter().
 
     Returns
@@ -668,7 +689,7 @@ def gaussian_gradient_magnitude(input, sigma, output=None,
 
     return generic_gradient_magnitude(input, derivative, output, mode,
                                       cval, extra_arguments=(sigma,),
-                                      extra_keywords=kwargs)
+                                      extra_keywords=kwargs, axes=axes)
 
 
 def _correlate_or_convolve(input, weights, output, mode, cval, origin,

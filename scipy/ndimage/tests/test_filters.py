@@ -839,17 +839,27 @@ class TestNdimageFilters:
         output = ndimage.laplace(array)
         assert_array_almost_equal(tmp1 + tmp2, output)
 
+    @pytest.mark.parametrize('axes', [(0,), (1,)])
+    def test_laplace_axis(self, axes):
+        array = numpy.array([[3, 2, 5, 1, 4],
+                             [5, 8, 3, 7, 1],
+                             [5, 6, 9, 3, 5]], numpy.int32) * 100
+        tmp1 = ndimage.correlate1d(array, [1, -2, 1], axes[0])
+        output = ndimage.laplace(array, axes=axes)
+        assert_array_almost_equal(tmp1, output)
+
     @pytest.mark.parametrize('dtype',
                              [numpy.int32, numpy.float32, numpy.float64,
                               numpy.complex64, numpy.complex128])
-    def test_laplace02(self, dtype):
+    @pytest.mark.parametrize('axes', [None, (0, 1)])
+    def test_laplace02(self, dtype, axes):
         array = numpy.array([[3, 2, 5, 1, 4],
                              [5, 8, 3, 7, 1],
                              [5, 6, 9, 3, 5]], dtype) * 100
         tmp1 = ndimage.correlate1d(array, [1, -2, 1], 0)
         tmp2 = ndimage.correlate1d(array, [1, -2, 1], 1)
         output = numpy.zeros(array.shape, dtype)
-        ndimage.laplace(array, output=output)
+        ndimage.laplace(array, output=output, axes=axes)
         assert_array_almost_equal(tmp1 + tmp2, output)
 
     @pytest.mark.parametrize('dtype',
@@ -864,17 +874,30 @@ class TestNdimageFilters:
         output = ndimage.gaussian_laplace(array, 1.0)
         assert_array_almost_equal(tmp1 + tmp2, output)
 
+    @pytest.mark.parametrize('axes', [(0,), (1,)])
+    def test_gaussian_laplace_axis(self, axes):
+        array = numpy.array([[3, 2, 5, 1, 4],
+                             [5, 8, 3, 7, 1],
+                             [5, 6, 9, 3, 5]], numpy.int32) * 100
+        if axes[0] == 0:
+            tmp1 = ndimage.gaussian_filter(array, 1.0, [2, 0])
+        else:
+            tmp1 = ndimage.gaussian_filter(array, 1.0, [0, 2])
+        output = ndimage.gaussian_laplace(array, 1.0, axes=axes)
+        assert_array_almost_equal(tmp1, output)
+
     @pytest.mark.parametrize('dtype',
                              [numpy.int32, numpy.float32, numpy.float64,
                               numpy.complex64, numpy.complex128])
-    def test_gaussian_laplace02(self, dtype):
+    @pytest.mark.parametrize('axes', [None, (0, 1)])
+    def test_gaussian_laplace02(self, dtype, axes):
         array = numpy.array([[3, 2, 5, 1, 4],
                              [5, 8, 3, 7, 1],
                              [5, 6, 9, 3, 5]], dtype) * 100
         tmp1 = ndimage.gaussian_filter(array, 1.0, [2, 0])
         tmp2 = ndimage.gaussian_filter(array, 1.0, [0, 2])
         output = numpy.zeros(array.shape, dtype)
-        ndimage.gaussian_laplace(array, 1.0, output)
+        ndimage.gaussian_laplace(array, 1.0, output, axes=axes)
         assert_array_almost_equal(tmp1 + tmp2, output)
 
     @pytest.mark.parametrize('dtype', types + complex_types)
@@ -910,6 +933,18 @@ class TestNdimageFilters:
         expected = numpy.sqrt(expected).astype(dtype)
         assert_array_almost_equal(expected, output)
 
+    @pytest.mark.parametrize('axes', [(0,), (1,)])
+    def test_gaussian_gradient_magnitude01(self, axes):
+        array = numpy.array([[3, 2, 5, 1, 4],
+                             [5, 8, 3, 7, 1],
+                             [5, 6, 9, 3, 5]], numpy.float32) * 100
+        if axes[0] == 0:
+            tmp1 = ndimage.gaussian_filter(array, 1.0, [1, 0])
+        else:
+            tmp1 = ndimage.gaussian_filter(array, 1.0, [0, 1])
+        output = ndimage.gaussian_gradient_magnitude(array, 1.0, axes=axes)
+        assert_array_almost_equal(numpy.abs(tmp1), output)
+
     @pytest.mark.parametrize('dtype',
                              [numpy.int32, numpy.float32, numpy.float64,
                               numpy.complex64, numpy.complex128])
@@ -925,7 +960,8 @@ class TestNdimageFilters:
         expected = numpy.sqrt(expected).astype(dtype)
         assert_array_almost_equal(expected, output)
 
-    def test_generic_gradient_magnitude01(self):
+    @pytest.mark.parametrize('axes', [None, (0, 1)])
+    def test_generic_gradient_magnitude01(self, axes):
         array = numpy.array([[3, 2, 5, 1, 4],
                              [5, 8, 3, 7, 1],
                              [5, 6, 9, 3, 5]], numpy.float64)
@@ -937,10 +973,10 @@ class TestNdimageFilters:
             order[axis] = 1
             return ndimage.gaussian_filter(input, sigma, order,
                                            output, mode, cval)
-        tmp1 = ndimage.gaussian_gradient_magnitude(array, 1.0)
+        tmp1 = ndimage.gaussian_gradient_magnitude(array, 1.0, axes=axes)
         tmp2 = ndimage.generic_gradient_magnitude(
             array, derivative, extra_arguments=(1.0,),
-            extra_keywords={'b': 2.0})
+            extra_keywords={'b': 2.0}, axes=axes)
         assert_array_almost_equal(tmp1, tmp2)
 
     def test_uniform01(self):
