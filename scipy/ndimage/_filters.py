@@ -1242,7 +1242,7 @@ def _min_or_max_filter(input, size, footprint, structure, output, mode,
             if len(structure.shape) != input.ndim:
                 raise RuntimeError('structure array has incorrect shape')
             if num_axes != structure.ndim:
-                structure = np.expand_dims(
+                structure = numpy.expand_dims(
                     structure,
                     tuple(ax for ax in range(structure.ndim) if ax not in axes)
                 )

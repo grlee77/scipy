@@ -995,7 +995,7 @@ class TestNdimageFilters:
         assert_array_almost_equal(expected, output)
 
     @pytest.mark.parametrize('axes', [(0,), (1,)])
-    def test_gaussian_gradient_magnitude01(self, axes):
+    def test_gaussian_gradient_magnitude_axes(self, axes):
         array = numpy.array([[3, 2, 5, 1, 4],
                              [5, 8, 3, 7, 1],
                              [5, 6, 9, 3, 5]], numpy.float32) * 100
