@@ -633,11 +633,12 @@ class TestNdimageFilters:
     @pytest.mark.parametrize(
         'axes', tuple(itertools.combinations(range(-3, 3), 2))
     )
+    @pytest.mark.parametrize('dtype', [numpy.float32, numpy.complex64])
     @pytest.mark.parametrize(
         'func', [ndimage.correlate, ndimage.convolve]
     )
-    def test_correlate_convolve_axes(self, func, axes):
-        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+    def test_correlate_convolve_axes(self, func, dtype, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=dtype).reshape(6, 8, 12)
         weights = numpy.arange(3 * 5).reshape(3, 5)
         axes = tuple(ax % input.ndim for ax in axes)
         if len(tuple(set(axes))) != len(axes):
