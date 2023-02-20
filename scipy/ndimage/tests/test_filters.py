@@ -708,7 +708,7 @@ class TestNdimageFilters:
             return
         output = ndimage.gaussian_filter(input, sigma, axes=axes)
 
-        axes = tuple(ax % input.ndim for ax in axes)
+        # result should be equivalent to sigma=0.0 on unfiltered axes
         all_sigmas = (sigma if ax in axes else 0.0 for ax in range(input.ndim))
         expected = ndimage.gaussian_filter(input, all_sigmas)
         assert_allclose(output, expected)
@@ -969,6 +969,27 @@ class TestNdimageFilters:
         assert_array_almost_equal([[4, 6, 10], [10, 12, 16]], output.real)
         assert_equal(output.dtype.type, dtype_output)
 
+    @pytest.mark.parametrize(
+        'axes',
+        tuple(itertools.combinations(range(-3, 3), 1))
+        + tuple(itertools.combinations(range(-3, 3), 2))
+        + ((0, 1, 2),))
+    def test_uniform_axes(self, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        size = 3
+        axes = tuple(ax % input.ndim for ax in axes)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                ndimage.uniform_filter(input, size, axes=axes)
+            return
+        output = ndimage.uniform_filter(input, size, axes=axes)
+
+        # result should be equivalent to size=1 on any unfiltered axes
+        all_sizes = tuple(size if ax in axes else 1 for ax in range(input.ndim))
+        expected = ndimage.uniform_filter(input, all_sizes)
+        assert_allclose(output, expected)
+
     def test_minimum_filter01(self):
         array = numpy.array([1, 2, 3, 4, 5])
         filter_shape = numpy.array([2])
@@ -1143,6 +1164,53 @@ class TestNdimageFilters:
         assert_array_almost_equal([[7, 7, 9, 9, 5],
                                    [7, 9, 8, 9, 7],
                                    [8, 8, 8, 7, 7]], output)
+
+    @pytest.mark.parametrize(
+        'axes',
+        tuple(itertools.combinations(range(-3, 3), 1))
+        + tuple(itertools.combinations(range(-3, 3), 2))
+        + ((0, 1, 2),))
+    @pytest.mark.parametrize(
+        'func', [ndimage.minimum_filter, ndimage.maximum_filter]
+    )
+    def test_minmax_separable_axes(self, func, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        size = 3
+        axes = tuple(ax % input.ndim for ax in axes)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                func(input, size, axes=axes)
+            return
+        output = func(input, size, axes=axes)
+
+        # result should be equivalent to size=1 on any unfiltered axes
+        all_sizes = tuple(size if ax in axes else 1 for ax in range(input.ndim))
+        expected = func(input, all_sizes)
+        assert_allclose(output, expected)
+
+    @pytest.mark.parametrize(
+        'axes', tuple(itertools.combinations(range(-3, 3), 2))
+    )
+    @pytest.mark.parametrize(
+        'func', [ndimage.minimum_filter, ndimage.maximum_filter]
+    )
+    def test_minmax_nonseparable_axes(self, func, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        # use 2D triangular footprint because it is non-separable
+        footprint = numpy.tri(5)
+        axes = tuple(ax % input.ndim for ax in axes)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                func(input, footprint=footprint, axes=axes)
+            return
+        output = func(input, footprint=footprint, axes=axes)
+
+        missing_axis = tuple(set(range(3)) - set(axes))[0]
+        footprint_3d = numpy.expand_dims(footprint, missing_axis)
+        expected = func(input, footprint=footprint_3d)
+        assert_allclose(output, expected)
 
     def test_rank01(self):
         array = numpy.array([1, 2, 3, 4, 5])
