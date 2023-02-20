@@ -116,4 +116,4 @@ def _check_axes(axes, ndim):
         )
     if len(tuple(set(axes))) != len(axes):
         raise ValueError("axes must be unique")
-    return sorted(axes)
+    return axes
