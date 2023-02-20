@@ -672,7 +672,7 @@ def gaussian_gradient_magnitude(input, sigma, output=None,
 
 
 def _correlate_or_convolve(input, weights, output, mode, cval, origin,
-                           convolution):
+                           convolution, axes):
     input = numpy.asarray(input)
     weights = numpy.asarray(weights)
     complex_input = input.dtype.kind == 'c'
@@ -682,15 +682,24 @@ def _correlate_or_convolve(input, weights, output, mode, cval, origin,
             # As for numpy.correlate, conjugate weights rather than input.
             weights = weights.conj()
         kwargs = dict(
-            mode=mode, origin=origin, convolution=convolution
+            mode=mode, origin=origin, convolution=convolution, axes=axes
         )
         output = _ni_support._get_output(output, input, complex_output=True)
 
         return _complex_via_real_components(_correlate_or_convolve, input,
                                             weights, output, cval, **kwargs)
 
+    axes = _ni_support._check_axes(axes, input.ndim)
+    num_axes = len(axes)
     origins = _ni_support._normalize_sequence(origin, input.ndim)
     weights = numpy.asarray(weights, dtype=numpy.float64)
+    if num_axes < input.ndim:
+        if weights.ndim != num_axes:
+            raise RuntimeError("footprint.ndim must match len(axes)")
+        weights = numpy.expand_dims(
+            weights,
+            tuple(ax for ax in range(input.ndim) if ax not in axes)
+        )
     wshape = [ii for ii in weights.shape if ii > 0]
     if len(wshape) != input.ndim:
         raise RuntimeError('filter weights array has incorrect shape.')
@@ -726,7 +735,7 @@ def _correlate_or_convolve(input, weights, output, mode, cval, origin,
 
 @_ni_docstrings.docfiller
 def correlate(input, weights, output=None, mode='reflect', cval=0.0,
-              origin=0):
+              origin=0, *, axes=None):
     """
     Multidimensional correlation.
 
@@ -741,6 +750,11 @@ def correlate(input, weights, output=None, mode='reflect', cval=0.0,
     %(mode_reflect)s
     %(cval)s
     %(origin_multiple)s
+    axes : tuple of int or None, optional
+        If None, it is assumed all axes are to be filtered. Otherwise, only
+        the axes specified in the tuple will be considered. When `axes` is
+        specified, `weights.ndim` must match the number of axes. Any tuples
+        used for `origin` and/or `mode` must also match the number of axes.
 
     Returns
     -------
@@ -785,12 +799,12 @@ def correlate(input, weights, output=None, mode='reflect', cval=0.0,
 
     """
     return _correlate_or_convolve(input, weights, output, mode, cval,
-                                  origin, False)
+                                  origin, False, axes)
 
 
 @_ni_docstrings.docfiller
 def convolve(input, weights, output=None, mode='reflect', cval=0.0,
-             origin=0):
+             origin=0, *, axes=None):
     """
     Multidimensional convolution.
 
@@ -811,6 +825,11 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
         filter is centered to produce the first element of the output.
         Positive values shift the filter to the right, and negative values
         shift the filter to the left. Default is 0.
+    axes : tuple of int or None, optional
+        If None, it is assumed all axes are to be filtered. Otherwise, only
+        the axes specified in the tuple will be considered. When `axes` is
+        specified, `weights.ndim` must match the number of axes. Any tuples
+        used for `origin` and/or `mode` must also match the number of axes.
 
     Returns
     -------
@@ -896,7 +915,7 @@ def convolve(input, weights, output=None, mode='reflect', cval=0.0,
 
     """
     return _correlate_or_convolve(input, weights, output, mode, cval,
-                                  origin, True)
+                                  origin, True, axes)
 
 
 @_ni_docstrings.docfiller
@@ -1160,11 +1179,11 @@ def _min_or_max_filter(input, size, footprint, structure, output, mode,
         temp = output
         output = _ni_support._get_output(output.dtype, input)
     axes = _ni_support._check_axes(axes, input.ndim)
-    ndim_axes = len(axes)
+    num_axes = len(axes)
     if separable:
-        origins = _ni_support._normalize_sequence(origin, ndim_axes)
-        sizes = _ni_support._normalize_sequence(size, ndim_axes)
-        modes = _ni_support._normalize_sequence(mode, ndim_axes)
+        origins = _ni_support._normalize_sequence(origin, num_axes)
+        sizes = _ni_support._normalize_sequence(size, num_axes)
+        modes = _ni_support._normalize_sequence(mode, num_axes)
         axes = [(axes[ii], sizes[ii], origins[ii], modes[ii])
                 for ii in range(len(axes)) if sizes[ii] > 1]
         if minimum:
@@ -1179,7 +1198,9 @@ def _min_or_max_filter(input, size, footprint, structure, output, mode,
             output[...] = input[...]
     else:
         origins = _ni_support._normalize_sequence(origin, input.ndim)
-        if footprint.ndim < input.ndim:
+        if num_axes < input.ndim:
+            if footprint.ndim != num_axes:
+                raise RuntimeError("footprint.ndim must match len(axes)")
             footprint = numpy.expand_dims(
                 footprint,
                 tuple(ax for ax in range(input.ndim) if ax not in axes)
@@ -1195,7 +1216,7 @@ def _min_or_max_filter(input, size, footprint, structure, output, mode,
         if structure is not None:
             if len(structure.shape) != input.ndim:
                 raise RuntimeError('structure array has incorrect shape')
-            if ndim_axes != structure.ndim:
+            if num_axes != structure.ndim:
                 structure = np.expand_dims(
                     structure,
                     tuple(ax for ax in range(structure.ndim) if ax not in axes)

@@ -630,6 +630,38 @@ class TestNdimageFilters:
         self._validate_complex(array, kernel, dtype_output, mode='constant',
                                cval=5.0 + 2.0j)
 
+    @pytest.mark.parametrize(
+        'axes', tuple(itertools.combinations(range(-3, 3), 2))
+    )
+    @pytest.mark.parametrize(
+        'func', [ndimage.correlate, ndimage.convolve]
+    )
+    def test_correlate_convolve_axes(self, func, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        weights = numpy.arange(3 * 5).reshape(3, 5)
+        axes = tuple(ax % input.ndim for ax in axes)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                func(input, weights=weights, axes=axes)
+            return
+        output = func(input, weights=weights, axes=axes)
+
+        missing_axis = tuple(set(range(3)) - set(axes))[0]
+        weights_3d = numpy.expand_dims(weights, missing_axis)
+        expected = func(input, weights=weights_3d)
+        assert_allclose(output, expected)
+
+    @pytest.mark.parametrize('axes', [(0,), (0, 1, 2)])
+    @pytest.mark.parametrize(
+        'func', [ndimage.correlate, ndimage.convolve]
+    )
+    def test_correlate_convolve_invalid_axes(self, func, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        weights = numpy.arange(3 * 5).reshape(3, 5)
+        with pytest.raises(RuntimeError):
+            func(input, weights=weights, axes=axes)
+
     def test_gauss01(self):
         input = numpy.array([[1, 2, 3],
                              [2, 4, 6]], numpy.float32)
@@ -1211,6 +1243,31 @@ class TestNdimageFilters:
         footprint_3d = numpy.expand_dims(footprint, missing_axis)
         expected = func(input, footprint=footprint_3d)
         assert_allclose(output, expected)
+
+    @pytest.mark.parametrize('axes', [(0,), (0, 1, 2)])
+    @pytest.mark.parametrize(
+        'func', [ndimage.minimum_filter, ndimage.maximum_filter]
+    )
+    def test_minmax_invalid_num_axes(self, func, axes):
+        # len(axes) != footprint.ndim
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        footprint = numpy.ones((5, 5))
+
+        # raises when len(axes) != footprint.ndim
+        with pytest.raises(RuntimeError):
+            func(input, footprint=footprint, axes=axes)
+
+    @pytest.mark.parametrize('axes', [(3,), (-4), (1, 4)])
+    @pytest.mark.parametrize(
+        'func', [ndimage.minimum_filter, ndimage.maximum_filter]
+    )
+    def test_minmax_out_of_range_axes(self, func, axes):
+        # len(axes) != footprint.ndim
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+
+        # raises when len(axes) != footprint.ndim
+        with pytest.raises(ValueError):
+            func(input, size=3, axes=axes)
 
     def test_rank01(self):
         array = numpy.array([1, 2, 3, 4, 5])
