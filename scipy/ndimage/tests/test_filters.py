@@ -1,5 +1,6 @@
 ''' Some tests for filters '''
 import functools
+import itertools
 import math
 import numpy
 
@@ -690,6 +691,27 @@ class TestNdimageFilters:
         output1 = ndimage.gaussian_filter(input, 1.0)
         ndimage.gaussian_filter(input, 1.0, output=input)
         assert_array_almost_equal(output1, input)
+
+    @pytest.mark.parametrize(
+        'axes',
+        tuple(itertools.combinations(range(-3, 3), 1))
+        + tuple(itertools.combinations(range(-3, 3), 2))
+        + ((0, 1, 2),))
+    def test_gauss_axes(self, axes):
+        input = numpy.arange(6 * 8 * 12, dtype=numpy.float32).reshape(6, 8, 12)
+        sigma = 1.0
+        axes = tuple(ax % input.ndim for ax in axes)
+        if len(tuple(set(axes))) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                ndimage.gaussian_filter(input, sigma, axes=axes)
+            return
+        output = ndimage.gaussian_filter(input, sigma, axes=axes)
+
+        axes = tuple(ax % input.ndim for ax in axes)
+        all_sigmas = (sigma if ax in axes else 0.0 for ax in range(input.ndim))
+        expected = ndimage.gaussian_filter(input, all_sigmas)
+        assert_allclose(output, expected)
 
     @pytest.mark.parametrize('dtype', types + complex_types)
     def test_prewitt01(self, dtype):

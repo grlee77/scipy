@@ -29,6 +29,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from collections.abc import Iterable
+from numbers import Integral
 import warnings
 import numpy
 
@@ -95,3 +96,24 @@ def _get_output(output, input, shape=None, complex_output=False):
     elif complex_output and output.dtype.kind != 'c':
         raise RuntimeError("output must have complex dtype")
     return output
+
+
+def _check_axes(axes, ndim):
+    if axes is None:
+        return tuple(range(ndim))
+    elif isinstance(axes, Integral):
+        axes = (axes,)
+    if isinstance(axes, Iterable):
+        for ax in axes:
+            if not isinstance(ax, Integral):
+                raise ValueError(f"axes must be integers, found {ax}")
+            if ax < -ndim or ax > ndim - 1:
+                raise ValueError(f"specified axis: {ax} is out of range")
+        axes = tuple(ax % ndim if ax < 0 else ax for ax in axes)
+    else:
+        raise ValueError(
+            "axes must be an integer, iterable of integers or None"
+        )
+    if len(tuple(set(axes))) != len(axes):
+        raise ValueError("axes must be unique")
+    return sorted(axes)
