@@ -29,7 +29,11 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from collections.abc import Iterable
+<<<<<<< HEAD
 from numbers import Integral
+=======
+import operator
+>>>>>>> ndimage_gaussian_filter_add_axes
 import warnings
 import numpy
 
@@ -101,12 +105,11 @@ def _get_output(output, input, shape=None, complex_output=False):
 def _check_axes(axes, ndim):
     if axes is None:
         return tuple(range(ndim))
-    elif isinstance(axes, Integral):
-        axes = (axes,)
-    if isinstance(axes, Iterable):
+    elif numpy.isscalar(axes):
+        axes = (operator.index(axes),)
+    elif isinstance(axes, Iterable):
         for ax in axes:
-            if not isinstance(ax, Integral):
-                raise ValueError(f"axes must be integers, found {ax}")
+            axes = tuple(operator.index(ax) for ax in axes)
             if ax < -ndim or ax > ndim - 1:
                 raise ValueError(f"specified axis: {ax} is out of range")
         axes = tuple(ax % ndim if ax < 0 else ax for ax in axes)

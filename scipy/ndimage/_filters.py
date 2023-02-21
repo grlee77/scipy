@@ -311,7 +311,8 @@ def gaussian_filter(input, sigma, order=0, output=None,
         If None, it is assumed all axes are to be filtered. Otherwise, only
         the axes specified in the tuple will be considered. When `axes` is
         specified, any tuples used for `sigma`, `order`, `mode` and/or `radius`
-        must match the length of `axes`.
+        must match the length of `axes`. The ith entry in any of these tuples
+        corresponds to the ith entry in `axes.
 
     Returns
     -------
