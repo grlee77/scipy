@@ -214,21 +214,24 @@ def generate_binary_structure(rank, connectivity):
 
 
 def _binary_erosion(input, structure, iterations, mask, output,
-                    border_value, origin, invert, brute_force):
+                    border_value, origin, invert, brute_force,
+                    axes=None):
     try:
         iterations = operator.index(iterations)
     except TypeError as e:
         raise TypeError('iterations parameter should be an integer') from e
-
     input = numpy.asarray(input)
     if numpy.iscomplexobj(input):
         raise TypeError('Complex type not supported')
+    axes = _ni_support._check_axes(axes, input.ndim)
+    num_axes = len(axes)
     if structure is None:
-        structure = generate_binary_structure(input.ndim, 1)
+        structure = generate_binary_structure(num_axes, 1)
     else:
         structure = numpy.asarray(structure, dtype=bool)
-    if structure.ndim != input.ndim:
-        raise RuntimeError('structure and input must have same dimensionality')
+        if structure.ndim != num_axes:
+            raise RuntimeError("structure.ndim must match the number of "
+                               "filtered axes")
     if not structure.flags.contiguous:
         structure = structure.copy()
     if numpy.prod(structure.shape, axis=0) < 1:
@@ -237,8 +240,19 @@ def _binary_erosion(input, structure, iterations, mask, output,
         mask = numpy.asarray(mask)
         if mask.shape != input.shape:
             raise RuntimeError('mask and input must have equal sizes')
-    origin = _ni_support._normalize_sequence(origin, input.ndim)
+    origin = _ni_support._normalize_sequence(origin, num_axes)
     cit = _center_is_true(structure, origin)
+    if num_axes < input.ndim:
+        # set origin = 0 for any axes not being filtered
+        origin_temp = [0,] * input.ndim
+        for o, ax in zip(origin, axes):
+            origin_temp[ax] = o
+        origin = origin_temp
+        # add singleton dimension to structure along non-filtered axes
+        structure = numpy.expand_dims(
+            structure,
+            tuple(ax for ax in range(input.ndim) if ax not in axes)
+        )
     if isinstance(output, numpy.ndarray):
         if numpy.iscomplexobj(output):
             raise TypeError('Complex output type not supported')
@@ -291,7 +305,7 @@ def _binary_erosion(input, structure, iterations, mask, output,
 
 
 def binary_erosion(input, structure=None, iterations=1, mask=None, output=None,
-                   border_value=0, origin=0, brute_force=False):
+                   border_value=0, origin=0, brute_force=False, *, axes=None):
     """
     Multidimensional binary erosion with a given structuring element.
 
@@ -327,6 +341,12 @@ def binary_erosion(input, structure=None, iterations=1, mask=None, output=None,
         the current iteration; if True all pixels are considered as candidates
         for erosion, regardless of what happened in the previous iteration.
         False by default.
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -385,12 +405,13 @@ def binary_erosion(input, structure=None, iterations=1, mask=None, output=None,
 
     """
     return _binary_erosion(input, structure, iterations, mask,
-                           output, border_value, origin, 0, brute_force)
+                           output, border_value, origin, 0, brute_force,
+                           axes=axes)
 
 
 def binary_dilation(input, structure=None, iterations=1, mask=None,
                     output=None, border_value=0, origin=0,
-                    brute_force=False):
+                    brute_force=False, *, axes=None):
     """
     Multidimensional binary dilation with the given structuring element.
 
@@ -424,6 +445,12 @@ def binary_dilation(input, structure=None, iterations=1, mask=None,
         in the current iteration; if True all pixels are considered as
         candidates for dilation, regardless of what happened in the previous
         iteration. False by default.
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -506,9 +533,11 @@ def binary_dilation(input, structure=None, iterations=1, mask=None,
 
     """
     input = numpy.asarray(input)
+    axes = _ni_support._check_axes(axes, input.ndim)
+    num_axes = len(axes)    
     if structure is None:
-        structure = generate_binary_structure(input.ndim, 1)
-    origin = _ni_support._normalize_sequence(origin, input.ndim)
+        structure = generate_binary_structure(num_axes, 1)
+    origin = _ni_support._normalize_sequence(origin, num_axes)
     structure = numpy.asarray(structure)
     structure = structure[tuple([slice(None, None, -1)] *
                                 structure.ndim)]
@@ -518,11 +547,13 @@ def binary_dilation(input, structure=None, iterations=1, mask=None,
             origin[ii] -= 1
 
     return _binary_erosion(input, structure, iterations, mask,
-                           output, border_value, origin, 1, brute_force)
+                           output, border_value, origin, 1, brute_force,
+                           axes=axes)
 
 
 def binary_opening(input, structure=None, iterations=1, output=None,
-                   origin=0, mask=None, border_value=0, brute_force=False):
+                   origin=0, mask=None, border_value=0, brute_force=False, *,
+                   axes=None):
     """
     Multidimensional binary opening with the given structuring element.
 
@@ -567,6 +598,12 @@ def binary_opening(input, structure=None, iterations=1, output=None,
         False by default.
 
         .. versionadded:: 1.1.0
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -635,18 +672,20 @@ def binary_opening(input, structure=None, iterations=1, output=None,
 
     """
     input = numpy.asarray(input)
+    axes = _ni_support._check_axes(axes, input.ndim)
     if structure is None:
-        rank = input.ndim
+        rank = len(axes)
         structure = generate_binary_structure(rank, 1)
 
     tmp = binary_erosion(input, structure, iterations, mask, None,
-                         border_value, origin, brute_force)
+                         border_value, origin, brute_force, axes=axes)
     return binary_dilation(tmp, structure, iterations, mask, output,
-                           border_value, origin, brute_force)
+                           border_value, origin, brute_force, axes=axes)
 
 
 def binary_closing(input, structure=None, iterations=1, output=None,
-                   origin=0, mask=None, border_value=0, brute_force=False):
+                   origin=0, mask=None, border_value=0, brute_force=False, *,
+                   axes=None):
     """
     Multidimensional binary closing with the given structuring element.
 
@@ -691,6 +730,12 @@ def binary_closing(input, structure=None, iterations=1, output=None,
         False by default.
 
         .. versionadded:: 1.1.0
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -782,18 +827,19 @@ def binary_closing(input, structure=None, iterations=1, output=None,
 
     """
     input = numpy.asarray(input)
+    axes = _ni_support._check_axes(axes, input.ndim)
     if structure is None:
-        rank = input.ndim
+        rank = len(axes)
         structure = generate_binary_structure(rank, 1)
 
     tmp = binary_dilation(input, structure, iterations, mask, None,
-                          border_value, origin, brute_force)
+                          border_value, origin, brute_force, axes=axes)
     return binary_erosion(tmp, structure, iterations, mask, output,
-                          border_value, origin, brute_force)
+                          border_value, origin, brute_force, axes=axes)
 
 
 def binary_hit_or_miss(input, structure1=None, structure2=None,
-                       output=None, origin1=0, origin2=None):
+                       output=None, origin1=0, origin2=None, *, axes=None):
     """
     Multidimensional binary hit-or-miss transform.
 
@@ -822,6 +868,12 @@ def binary_hit_or_miss(input, structure1=None, structure2=None,
         Placement of the second part of the structuring element `structure2`,
         by default 0 for a centered structure. If a value is provided for
         `origin1` and not for `origin2`, then `origin2` is set to `origin1`.
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -879,21 +931,23 @@ def binary_hit_or_miss(input, structure1=None, structure2=None,
 
     """
     input = numpy.asarray(input)
+    axes = _ni_support._check_axes(axes, input.ndim)
+    num_axes = len(axes)
     if structure1 is None:
-        structure1 = generate_binary_structure(input.ndim, 1)
+        structure1 = generate_binary_structure(num_axes, 1)
     if structure2 is None:
         structure2 = numpy.logical_not(structure1)
-    origin1 = _ni_support._normalize_sequence(origin1, input.ndim)
+    origin1 = _ni_support._normalize_sequence(origin1, num_axes)
     if origin2 is None:
         origin2 = origin1
     else:
-        origin2 = _ni_support._normalize_sequence(origin2, input.ndim)
+        origin2 = _ni_support._normalize_sequence(origin2, num_axes)
 
     tmp1 = _binary_erosion(input, structure1, 1, None, None, 0, origin1,
-                           0, False)
+                           0, False, axes=axes)
     inplace = isinstance(output, numpy.ndarray)
     result = _binary_erosion(input, structure2, 1, None, output, 0,
-                             origin2, 1, False)
+                             origin2, 1, False, axes=axes)
     if inplace:
         numpy.logical_not(output, output)
         numpy.logical_and(tmp1, output, output)
@@ -903,7 +957,7 @@ def binary_hit_or_miss(input, structure1=None, structure2=None,
 
 
 def binary_propagation(input, structure=None, mask=None,
-                       output=None, border_value=0, origin=0):
+                       output=None, border_value=0, origin=0, *, axes=None):
     """
     Multidimensional binary propagation with the given structuring element.
 
@@ -927,6 +981,12 @@ def binary_propagation(input, structure=None, mask=None,
         Value at the border in the output array.
     origin : int or tuple of ints, optional
         Placement of the filter, by default 0.
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -1031,10 +1091,11 @@ def binary_propagation(input, structure=None, mask=None,
 
     """
     return binary_dilation(input, structure, -1, mask, output,
-                           border_value, origin)
+                           border_value, origin, axes=axes)
 
 
-def binary_fill_holes(input, structure=None, output=None, origin=0):
+def binary_fill_holes(input, structure=None, output=None, origin=0, *,
+                      axes=None):
     """
     Fill the holes in binary objects.
 
@@ -1054,6 +1115,12 @@ def binary_fill_holes(input, structure=None, output=None, origin=0):
         By default, a new array is created.
     origin : int, tuple of ints, optional
         Position of the structuring element.
+    axes : tuple of int or None, optional
+        If None, `input` is filtered along all axes. Otherwise,
+        `input` is filtered along the specified axes. When `axes` is
+        specified and a tuple is used for `origin`, its length must match the
+        length of `axes`. The ith entry in `origin` corresponds to
+        the ith entry in `axes`.
 
     Returns
     -------
@@ -1110,11 +1177,11 @@ def binary_fill_holes(input, structure=None, output=None, origin=0):
     tmp = numpy.zeros(mask.shape, bool)
     inplace = isinstance(output, numpy.ndarray)
     if inplace:
-        binary_dilation(tmp, structure, -1, mask, output, 1, origin)
+        binary_dilation(tmp, structure, -1, mask, output, 1, origin, axes=axes)
         numpy.logical_not(output, output)
     else:
         output = binary_dilation(tmp, structure, -1, mask, None, 1,
-                                 origin)
+                                 origin, axes=axes)
         numpy.logical_not(output, output)
         return output
 

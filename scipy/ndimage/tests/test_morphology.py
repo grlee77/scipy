@@ -1,3 +1,5 @@
+import itertools
+
 import numpy
 from numpy.testing import (assert_, assert_equal, assert_array_equal,
                            assert_array_almost_equal)
@@ -1875,6 +1877,125 @@ class TestNdimageMorphology:
                             [0, 0, 0, 0, 0, 0, 0, 0]], bool)
         out = ndimage.binary_fill_holes(data)
         assert_array_almost_equal(out, expected)
+
+    def _binary_3d_vol(self, shape):
+        # create a binary volume with some lines and basic shapes
+        array = numpy.zeros(shape, dtype=bool)
+        center = tuple(s // 2 for s in shape)
+        array[center[0], :, :] = 1
+        array[:, center[1], :] = 1
+        array[:, :, center[2]] = 1
+        sz = max(1, min(shape) // 4)
+        center_sl = tuple(slice(c - sz, c + sz) for c in center)
+        array[center_sl] = 1
+        x = numpy.arange(shape[0])[:, numpy.newaxis, numpy.newaxis]
+        y = numpy.arange(shape[1])[numpy.newaxis, :, numpy.newaxis]
+        z = numpy.arange(shape[2])[numpy.newaxis, numpy.newaxis, :]
+        dist = x**2 + y**2 + z**2
+        array[dist < min(shape)//2] = 1
+        return array
+
+    @pytest.mark.parametrize(
+        'axes', tuple(itertools.combinations(range(-3, 3), 2))
+    )
+    @pytest.mark.parametrize(
+        'filter_func',
+        [ndimage.binary_erosion,
+         ndimage.binary_dilation,
+         ndimage.binary_opening,
+         ndimage.binary_closing,
+         ndimage.binary_fill_holes,
+         ndimage.binary_hit_or_miss,
+         ndimage.binary_propagation]
+    )
+    @pytest.mark.parametrize('default_structure', [False, True])
+    def test_binary_axes(self, filter_func, axes, default_structure):
+        shape = (12, 14, 16)
+        array = self._binary_3d_vol(shape)
+
+        origins_3d = [0, 0, 0]
+        origins_axes = [-1, 1]
+        for o, ax in zip(origins_axes, axes):
+            origins_3d[ax] = o
+
+        if filter_func == ndimage.binary_hit_or_miss:
+            structure_key = 'structure1'
+            origin_key = 'origin1'
+        else:
+            structure_key = 'structure'
+            origin_key = 'origin'
+
+        if default_structure:
+            structure = None
+        else:
+            structure = ndimage.generate_binary_structure(len(axes), 2)
+
+        axes = numpy.array(axes)
+        kwargs = {structure_key: structure, origin_key: origins_axes}
+        if len(set(axes % array.ndim)) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError):
+                filter_func(array, axes=axes, **kwargs)
+            return
+        output = filter_func(array, axes=axes, **kwargs)
+
+        if default_structure:
+            # set to 2d structure used when structure = None
+            structure = ndimage.generate_binary_structure(len(axes), 1)
+        missing_axis = tuple(set(range(3)) - set(axes % array.ndim))[0]
+        structure_3d = numpy.expand_dims(structure, missing_axis)
+        kwargs[structure_key] = structure_3d
+        kwargs[origin_key] = origins_3d
+        expected = filter_func(array, **kwargs)
+        assert_array_equal(output, expected)
+
+    @pytest.mark.parametrize(
+        'filter_func',
+        [ndimage.binary_erosion,
+         ndimage.binary_dilation,
+         ndimage.binary_opening,
+         ndimage.binary_closing,
+         ndimage.binary_fill_holes,
+         ndimage.binary_hit_or_miss,
+         ndimage.binary_propagation])
+    @pytest.mark.parametrize(
+        'axes', [(1.5,), (0, 1, 2, 3), (3,), (-4,)]
+    )
+    def test_binary_invalid_axes(self, filter_func, axes):
+        shape = (8, 10, 12)
+        array = self._binary_3d_vol(shape)
+        if any(isinstance(ax, float) for ax in axes):
+            error_class = TypeError
+            match = "cannot be interpreted as an integer"
+        else:
+            error_class = ValueError
+            match = "out of range"
+        with pytest.raises(error_class, match=match):
+            filter_func(array, axes=axes)
+
+    @pytest.mark.parametrize(
+        'filter_func',
+        [ndimage.binary_erosion,
+         ndimage.binary_dilation,
+         ndimage.binary_opening,
+         ndimage.binary_closing,
+         ndimage.binary_fill_holes,
+         ndimage.binary_hit_or_miss,
+         ndimage.binary_propagation])
+    @pytest.mark.parametrize('num_origin', (1, 3))
+    def test_binary_origin_length_mismatch(self, filter_func, num_origin):
+        shape = (8, 10, 12)
+        array = self._binary_3d_vol(shape)
+
+        axes = (-2, -1)
+        err_msg = "sequence argument must have length equal to input rank"
+        if filter_func == ndimage.binary_hit_or_miss:
+            kwargs = dict(origin1=(0,) * num_origin)
+        else:
+            kwargs = dict(origin=(0,) * num_origin)
+        with pytest.raises(RuntimeError, match=err_msg):
+            filter_func(array, axes=axes, **kwargs)
+
 
     def test_grey_erosion01(self):
         array = numpy.array([[3, 2, 5, 1, 4],
