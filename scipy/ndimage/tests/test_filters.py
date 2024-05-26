@@ -743,9 +743,62 @@ class TestNdimageFilters:
         output = filter_func(array, *extra_args, size, axes=axes)
 
         # result should be equivalent to sigma=0.0/size=1 on unfiltered axes
-        all_sizes = (size if ax in (axes % array.ndim) else size0
-                     for ax in range(array.ndim))
+        all_sizes = tuple(size if ax in (axes % array.ndim) else size0
+                          for ax in range(array.ndim))
         expected = filter_func(array, *extra_args, all_sizes)
+        assert_allclose(output, expected)
+
+    @pytest.mark.parametrize(('filter_func', 'kwargs'),
+                             [(ndimage.laplace, {}),
+                              (ndimage.gaussian_gradient_magnitude,
+                               {"sigma": 1.0}),
+                              (ndimage.gaussian_laplace, {"sigma": 0.5})])
+    def test_derivative_filter_axes(self, filter_func, kwargs):
+        array = np.arange(6 * 8 * 12, dtype=np.float64).reshape(6, 8, 12)
+
+        # duplicate axes raises an error
+        with pytest.raises(ValueError, match="axes must be unique"):
+            filter_func(array, axes=(1, 1), **kwargs)
+
+        # compare results to manually looping over the non-filtered axes
+        output = filter_func(array, axes=(1, 2), **kwargs)
+        expected = np.empty_like(output)
+        for i in range(array.shape[0]):
+            expected[i, ...] = filter_func(array[i, ...], **kwargs)
+        assert_allclose(output, expected)
+
+        output = filter_func(array, axes=(0, -1), **kwargs)
+        expected = np.empty_like(output)
+        for i in range(array.shape[1]):
+            expected[:, i, :] = filter_func(array[:, i, :], **kwargs)
+        assert_allclose(output, expected)
+
+        output = filter_func(array, axes=(1), **kwargs)
+        expected = np.empty_like(output)
+        for i in range(array.shape[0]):
+            for j in range(array.shape[2]):
+                expected[i, :, j] = filter_func(array[i, :, j], **kwargs)
+        assert_allclose(output, expected)
+
+    @pytest.mark.parametrize(
+        'axes',
+        tuple(itertools.combinations(range(-3, 3), 1))
+        + tuple(itertools.combinations(range(-3, 3), 2))
+        + ((0, 1, 2),))
+    def test_generic_filter_axes(self, axes):
+        array = np.arange(6 * 8 * 12, dtype=np.float64).reshape(6, 8, 12)
+        axes = np.asarray(axes)
+        size = 3
+
+        if len(set(axes % array.ndim)) != len(axes):
+            # parametrized cases with duplicate axes raise an error
+            with pytest.raises(ValueError, match="axes must be unique"):
+                ndimage.generic_filter(array, np.amax, size=size, axes=axes)
+            return
+
+        # choose np.amax as the function so we can compare to maximum_filter
+        output = ndimage.generic_filter(array, np.amax, size=size, axes=axes)
+        expected = ndimage.maximum_filter(array, size=size, axes=axes)
         assert_allclose(output, expected)
 
     @pytest.mark.parametrize('func', [ndimage.correlate, ndimage.convolve])
@@ -824,6 +877,7 @@ class TestNdimageFilters:
             kwargs['origin'] = origin
         expected = filter_func(array, *args, size_3d, **kwargs)
         assert_allclose(output, expected)
+
 
     @pytest.mark.parametrize("filter_func, kwargs",
                              [(ndimage.convolve, {}),
