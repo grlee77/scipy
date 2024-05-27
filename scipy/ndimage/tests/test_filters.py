@@ -917,7 +917,8 @@ class TestNdimageFilters:
             match = re.escape(f"weights.ndim ({footprint.ndim}) must match "
                               f"len(axes) ({len(axes)})")
         else:
-            match = "footprint array has incorrect shape"
+            match = re.escape(f"footprint.ndim ({footprint.ndim}) must match "
+                              f"len(axes) ({len(axes)})")
         if filter_func in [ndimage.convolve, ndimage.correlate]:
             kwargs["weights"] = footprint
         else:
