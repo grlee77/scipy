@@ -45,11 +45,10 @@ from scipy._lib._util import _rename_parameter, _contains_nan
 from scipy._lib._bunch import _make_tuple_bunch
 import scipy.special as special
 import scipy.stats._stats_py
+import scipy.stats._stats_py as _stats_py
 
 from ._stats_mstats_common import (
         _find_repeats,
-        linregress as stats_linregress,
-        LinregressResult as stats_LinregressResult,
         theilslopes as stats_theilslopes,
         siegelslopes as stats_siegelslopes
         )
@@ -93,11 +92,11 @@ def _ttest_finish(df, t, alternative):
     # We use ``stdtr`` directly here to preserve masked arrays
 
     if alternative == 'less':
-        pval = special.stdtr(df, t)
+        pval = special._ufuncs.stdtr(df, t)
     elif alternative == 'greater':
-        pval = special.stdtr(df, -t)
+        pval = special._ufuncs.stdtr(df, -t)
     elif alternative == 'two-sided':
-        pval = special.stdtr(df, -np.abs(t))*2
+        pval = special._ufuncs.stdtr(df, -np.abs(t))*2
     else:
         raise ValueError("alternative must be "
                          "'less', 'greater' or 'two-sided'")
@@ -1174,15 +1173,15 @@ def linregress(x, y=None):
         x = ma.array(x, mask=m)
         y = ma.array(y, mask=m)
         if np.any(~m):
-            result = stats_linregress(x.data[~m], y.data[~m])
+            result = _stats_py.linregress(x.data[~m], y.data[~m])
         else:
             # All data is masked
-            result = stats_LinregressResult(slope=None, intercept=None,
-                                            rvalue=None, pvalue=None,
-                                            stderr=None,
-                                            intercept_stderr=None)
+            result = _stats_py.LinregressResult(slope=None, intercept=None,
+                                                rvalue=None, pvalue=None,
+                                                stderr=None,
+                                                intercept_stderr=None)
     else:
-        result = stats_linregress(x.data, y.data)
+        result = _stats_py.linregress(x.data, y.data)
 
     return result
 
@@ -2608,8 +2607,8 @@ def winsorize(a, limits=None, inclusive=(True, True), inplace=False,
 
     >>> a = np.array([10, 4, 9, 8, 5, 3, 7, 2, 1, 6])
 
-    The 10% of the lowest value (i.e., `1`) and the 20% of the highest
-    values (i.e., `9` and `10`) are replaced.
+    The 10% of the lowest value (i.e., ``1``) and the 20% of the highest
+    values (i.e., ``9`` and ``10``) are replaced.
 
     >>> winsorize(a, limits=[0.1, 0.2])
     masked_array(data=[8, 4, 8, 8, 5, 3, 7, 2, 2, 6],
