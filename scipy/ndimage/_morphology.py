@@ -1165,7 +1165,8 @@ def binary_fill_holes(input, structure=None, output=None, origin=0, *,
 
 
 def grey_erosion(input, size=None, footprint=None, structure=None,
-                 output=None, mode="reflect", cval=0.0, origin=0):
+                 output=None, mode="reflect", cval=0.0, origin=0, *,
+                 axes=None):
     """
     Calculate a greyscale erosion, using either a structuring element,
     or a footprint corresponding to a flat structuring element.
@@ -1200,6 +1201,10 @@ def grey_erosion(input, size=None, footprint=None, structure=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default 0
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1272,11 +1277,13 @@ def grey_erosion(input, size=None, footprint=None, structure=None,
         raise ValueError("size, footprint, or structure must be specified")
 
     return _filters._min_or_max_filter(input, size, footprint, structure,
-                                       output, mode, cval, origin, 1)
+                                       output, mode, cval, origin, 1,
+                                       axes=axes)
 
 
 def grey_dilation(input, size=None, footprint=None, structure=None,
-                  output=None, mode="reflect", cval=0.0, origin=0):
+                  output=None, mode="reflect", cval=0.0, origin=0, *,
+                  axes=None):
     """
     Calculate a greyscale dilation, using either a structuring element,
     or a footprint corresponding to a flat structuring element.
@@ -1311,6 +1318,10 @@ def grey_dilation(input, size=None, footprint=None, structure=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default 0
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1406,7 +1417,8 @@ def grey_dilation(input, size=None, footprint=None, structure=None,
                                     footprint.ndim)]
 
     input = np.asarray(input)
-    origin = _ni_support._normalize_sequence(origin, input.ndim)
+    axes = _ni_support._check_axes(axes, input.ndim)
+    origin = _ni_support._normalize_sequence(origin, len(axes))
     for ii in range(len(origin)):
         origin[ii] = -origin[ii]
         if footprint is not None:
@@ -1421,11 +1433,13 @@ def grey_dilation(input, size=None, footprint=None, structure=None,
             origin[ii] -= 1
 
     return _filters._min_or_max_filter(input, size, footprint, structure,
-                                       output, mode, cval, origin, 0)
+                                       output, mode, cval, origin, 0,
+                                       axes=axes)
 
 
 def grey_opening(input, size=None, footprint=None, structure=None,
-                 output=None, mode="reflect", cval=0.0, origin=0):
+                 output=None, mode="reflect", cval=0.0, origin=0, *,
+                 axes=None):
     """
     Multidimensional grayscale opening.
 
@@ -1457,6 +1471,10 @@ def grey_opening(input, size=None, footprint=None, structure=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default 0
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1504,13 +1522,14 @@ def grey_opening(input, size=None, footprint=None, structure=None,
         warnings.warn("ignoring size because footprint is set",
                       UserWarning, stacklevel=2)
     tmp = grey_erosion(input, size, footprint, structure, None, mode,
-                       cval, origin)
+                       cval, origin, axes=axes)
     return grey_dilation(tmp, size, footprint, structure, output, mode,
-                         cval, origin)
+                         cval, origin, axes=axes)
 
 
 def grey_closing(input, size=None, footprint=None, structure=None,
-                 output=None, mode="reflect", cval=0.0, origin=0):
+                 output=None, mode="reflect", cval=0.0, origin=0, *,
+                 axes=None):
     """
     Multidimensional grayscale closing.
 
@@ -1542,6 +1561,10 @@ def grey_closing(input, size=None, footprint=None, structure=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default 0
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1589,13 +1612,14 @@ def grey_closing(input, size=None, footprint=None, structure=None,
         warnings.warn("ignoring size because footprint is set",
                       UserWarning, stacklevel=2)
     tmp = grey_dilation(input, size, footprint, structure, None, mode,
-                        cval, origin)
+                        cval, origin, axes=axes)
     return grey_erosion(tmp, size, footprint, structure, output, mode,
-                        cval, origin)
+                        cval, origin, axes=axes)
 
 
 def morphological_gradient(input, size=None, footprint=None, structure=None,
-                           output=None, mode="reflect", cval=0.0, origin=0):
+                           output=None, mode="reflect", cval=0.0, origin=0, *,
+                           axes=None):
     """
     Multidimensional morphological gradient.
 
@@ -1630,6 +1654,10 @@ def morphological_gradient(input, size=None, footprint=None, structure=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default 0
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1698,19 +1726,19 @@ def morphological_gradient(input, size=None, footprint=None, structure=None,
 
     """
     tmp = grey_dilation(input, size, footprint, structure, None, mode,
-                        cval, origin)
+                        cval, origin, axes=axes)
     if isinstance(output, np.ndarray):
         grey_erosion(input, size, footprint, structure, output, mode,
-                     cval, origin)
+                     cval, origin, axes=axes)
         return np.subtract(tmp, output, output)
     else:
         return (tmp - grey_erosion(input, size, footprint, structure,
-                                   None, mode, cval, origin))
+                                   None, mode, cval, origin, axes=axes))
 
 
-def morphological_laplace(input, size=None, footprint=None,
-                          structure=None, output=None,
-                          mode="reflect", cval=0.0, origin=0):
+def morphological_laplace(input, size=None, footprint=None, structure=None,
+                          output=None, mode="reflect", cval=0.0, origin=0, *,
+                          axes=None):
     """
     Multidimensional morphological laplace.
 
@@ -1735,6 +1763,10 @@ def morphological_laplace(input, size=None, footprint=None,
         Default is 0.0
     origin : origin, optional
         The origin parameter controls the placement of the filter.
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1743,16 +1775,16 @@ def morphological_laplace(input, size=None, footprint=None,
 
     """
     tmp1 = grey_dilation(input, size, footprint, structure, None, mode,
-                         cval, origin)
+                         cval, origin, axes=axes)
     if isinstance(output, np.ndarray):
         grey_erosion(input, size, footprint, structure, output, mode,
-                     cval, origin)
+                     cval, origin, axes=axes)
         np.add(tmp1, output, output)
         np.subtract(output, input, output)
         return np.subtract(output, input, output)
     else:
         tmp2 = grey_erosion(input, size, footprint, structure, None, mode,
-                            cval, origin)
+                            cval, origin, axes=axes)
         np.add(tmp1, tmp2, tmp2)
         np.subtract(tmp2, input, tmp2)
         np.subtract(tmp2, input, tmp2)
@@ -1760,7 +1792,8 @@ def morphological_laplace(input, size=None, footprint=None,
 
 
 def white_tophat(input, size=None, footprint=None, structure=None,
-                 output=None, mode="reflect", cval=0.0, origin=0):
+                 output=None, mode="reflect", cval=0.0, origin=0, *,
+                 axes=None):
     """
     Multidimensional white tophat filter.
 
@@ -1789,6 +1822,10 @@ def white_tophat(input, size=None, footprint=None, structure=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default is 0.
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1823,9 +1860,9 @@ def white_tophat(input, size=None, footprint=None, structure=None,
         warnings.warn("ignoring size because footprint is set",
                       UserWarning, stacklevel=2)
     tmp = grey_erosion(input, size, footprint, structure, None, mode,
-                       cval, origin)
+                       cval, origin, axes=axes)
     tmp = grey_dilation(tmp, size, footprint, structure, output, mode,
-                        cval, origin)
+                        cval, origin, axes=axes)
     if tmp is None:
         tmp = output
 
@@ -1836,9 +1873,8 @@ def white_tophat(input, size=None, footprint=None, structure=None,
     return tmp
 
 
-def black_tophat(input, size=None, footprint=None,
-                 structure=None, output=None, mode="reflect",
-                 cval=0.0, origin=0):
+def black_tophat(input, size=None, footprint=None, structure=None, output=None,
+                 mode="reflect", cval=0.0, origin=0, *, axes=None):
     """
     Multidimensional black tophat filter.
 
@@ -1867,6 +1903,10 @@ def black_tophat(input, size=None, footprint=None,
     origin : scalar, optional
         The `origin` parameter controls the placement of the filter.
         Default 0
+    axes : tuple of int or None
+        The axes over which to apply the filter. If None, `input` is filtered
+        along all axes. If an `origin` tuple is provided, its length must match
+        the number of axes.
 
     Returns
     -------
@@ -1901,9 +1941,9 @@ def black_tophat(input, size=None, footprint=None,
         warnings.warn("ignoring size because footprint is set",
                       UserWarning, stacklevel=2)
     tmp = grey_dilation(input, size, footprint, structure, None, mode,
-                        cval, origin)
+                        cval, origin, axes=axes)
     tmp = grey_erosion(tmp, size, footprint, structure, output, mode,
-                       cval, origin)
+                       cval, origin, axes=axes)
     if tmp is None:
         tmp = output
 
